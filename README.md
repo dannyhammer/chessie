@@ -15,6 +15,7 @@ As a result, nearly every function in this library has examples of how to use th
 Only generate moves from specific squares (Knights, in this case):
 
 ```rust
+use chessie::{Game, Color};
 let game = Game::default(); // Default starting position
 let mask = game.knights(Color::White);
 for mv in game.iter().only_moves_from(mask) {
@@ -26,6 +27,7 @@ for mv in game.iter().only_moves_from(mask) {
 Only generate moves that capture enemy pieces:
 
 ```rust
+use chessie::Game;
 let game = Game::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1").unwrap();
 for mv in game.iter().only_captures() {
     print!("{mv} ");

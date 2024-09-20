@@ -1,3 +1,9 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 /// Four random u64 values.
 const SEEDS: [u64; 4] = [
     0b1001000111000101101010110011110011101011111111010101101001110001,

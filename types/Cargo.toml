@@ -2,6 +2,11 @@
 name = "types"
 version = "0.1.0"
 edition = "2021"
+authors = ["Danny Hammer <hammerapi@gmail.com>"]
+license = "MPL-2.0"
+description = "Internal crate for use in the `chessie` crate. Do not use independently"
+repository = "https://github.com/dannyhammer/chessie"
+homepage = "https://github.com/dannyhammer/chessie"
 
 [dependencies]
 anyhow = "1.0.86"
