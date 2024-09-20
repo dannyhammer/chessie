@@ -32,7 +32,15 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arrayvec",
- "types",
+ "chessie_types",
+]
+
+[[package]]
+name = "chessie_types"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "rand",
 ]
 
 [[package]]
@@ -118,14 +126,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
-]
-
-[[package]]
-name = "types"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "rand",
 ]
 
 [[package]]

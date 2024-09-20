@@ -1,0 +1,19 @@
+[package]
+name = "chessie"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+authors = ["Danny Hammer <hammerapi@gmail.com>"]
+license = "MPL-2.0"
+description = "Fast chess library, suitable for use in chess engines"
+repository = "https://github.com/dannyhammer/chessie"
+homepage = "https://github.com/dannyhammer/chessie"
+keywords = ["chess"]
+
+[dependencies]
+anyhow = "1.0.86"
+arrayvec = "0.7.4"
+chessie_types = { path = "../chessie_types", version = "0.1.0" }
+
+[build-dependencies]
+chessie_types = { path = "../chessie_types", version = "0.1.0" }

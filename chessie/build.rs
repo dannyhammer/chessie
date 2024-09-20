@@ -6,7 +6,7 @@
 
 use std::env;
 
-use types::{generate_piece_attack_datfiles, generate_ray_table_datfiles};
+use chessie_types::{generate_piece_attack_datfiles, generate_ray_table_datfiles};
 
 fn main() {
     // Re-run the build script if it was changed

@@ -46,7 +46,7 @@ impl Color {
     ///
     /// # Example
     /// ```
-    /// # use types::Color;
+    /// # use chessie_types::Color;
     /// let white = Color::from_bits(0);
     /// assert!(white.is_ok());
     /// assert_eq!(white.unwrap(), Color::White);
@@ -71,7 +71,7 @@ impl Color {
     ///
     /// # Example
     /// ```
-    /// # use types::Color;
+    /// # use chessie_types::Color;
     /// let white = Color::from_bits(0);
     /// assert!(white.is_ok());
     /// assert_eq!(white.unwrap(), Color::White);
@@ -93,7 +93,7 @@ impl Color {
     ///
     /// # Example
     /// ```
-    /// # use types::Color;
+    /// # use chessie_types::Color;
     /// let white = Color::from_bool(false);
     /// assert_eq!(white, Color::White);
     ///
@@ -118,7 +118,7 @@ impl Color {
     ///
     /// # Example
     /// ```
-    /// # use types::Color;
+    /// # use chessie_types::Color;
     /// assert_eq!(Color::White.negation_multiplier(), 1);
     /// assert_eq!(Color::Black.negation_multiplier(), -1);
     /// ```
@@ -142,7 +142,7 @@ impl Color {
     ///
     /// # Example
     /// ```
-    /// # use types::Color;
+    /// # use chessie_types::Color;
     /// assert_eq!(Color::White.opponent(), Color::Black);
     /// assert_eq!(Color::Black.opponent(), Color::White);
     /// ```
@@ -158,7 +158,7 @@ impl Color {
     ///
     /// # Example
     /// ```
-    /// # use types::Color;
+    /// # use chessie_types::Color;
     /// assert_eq!(Color::White.index(), 0);
     /// assert_eq!(Color::Black.index(), 1);
     /// ```
@@ -174,7 +174,7 @@ impl Color {
     ///
     /// # Example
     /// ```
-    /// # use types::Color;
+    /// # use chessie_types::Color;
     /// assert_eq!(Color::White.bits(), 0);
     /// assert_eq!(Color::Black.bits(), 1);
     /// ```
@@ -186,7 +186,7 @@ impl Color {
     ///
     /// # Example
     /// ```
-    /// # use types::Color;
+    /// # use chessie_types::Color;
     /// let white = Color::from_uci('w');
     /// assert!(white.is_ok());
     /// assert_eq!(white.unwrap(), Color::White);
@@ -208,7 +208,7 @@ impl Color {
     ///
     /// # Example
     /// ```
-    /// # use types::Color;
+    /// # use chessie_types::Color;
     /// assert_eq!(Color::from_case('k'), Color::Black);
     /// ```
     pub const fn from_case(c: char) -> Self {
@@ -219,7 +219,7 @@ impl Color {
     ///
     /// # Example
     /// ```
-    /// # use types::Color;
+    /// # use chessie_types::Color;
     /// assert_eq!(Color::White.to_uci(), 'w');
     /// ```
     pub const fn to_uci(&self) -> char {
@@ -233,7 +233,7 @@ impl Color {
     ///
     /// # Example
     /// ```
-    /// # use types::Color;
+    /// # use chessie_types::Color;
     /// assert_eq!(Color::White.as_str(), "w");
     /// ```
     pub const fn as_str(&self) -> &'static str {
@@ -247,7 +247,7 @@ impl Color {
     ///
     /// # Example
     /// ```
-    /// # use types::Color;
+    /// # use chessie_types::Color;
     /// let white = Color::White;
     /// assert_eq!(white.name(), "white");
     /// ```
@@ -315,7 +315,7 @@ impl PieceKind {
     ///
     /// # Example
     /// ```
-    /// # use types::PieceKind;
+    /// # use chessie_types::PieceKind;
     /// let queen = PieceKind::from_bits(4);
     /// assert!(queen.is_ok());
     /// assert_eq!(queen.unwrap(), PieceKind::Queen);
@@ -344,7 +344,7 @@ impl PieceKind {
     ///
     /// # Example
     /// ```
-    /// # use types::PieceKind;
+    /// # use chessie_types::PieceKind;
     /// let queen = PieceKind::from_bits_unchecked(4);
     /// assert_eq!(queen, PieceKind::Queen);
     /// ```
@@ -364,7 +364,7 @@ impl PieceKind {
     ///
     /// # Example
     /// ```
-    /// # use types::PieceKind;
+    /// # use chessie_types::PieceKind;
     /// let bits = PieceKind::Queen.bits();
     /// assert_eq!(bits, 4);
     /// ```
@@ -380,7 +380,7 @@ impl PieceKind {
     ///
     /// # Example
     /// ```
-    /// # use types::PieceKind;
+    /// # use chessie_types::PieceKind;
     /// let index = PieceKind::Queen.index();
     /// assert_eq!(index, 4);
     /// ```
@@ -394,7 +394,7 @@ impl PieceKind {
     ///
     /// # Example
     /// ```
-    /// # use types::PieceKind;
+    /// # use chessie_types::PieceKind;
     /// let queen = PieceKind::from_uci('Q');
     /// assert!(queen.is_ok());
     /// assert_eq!(queen.unwrap(), PieceKind::Queen);
@@ -415,7 +415,7 @@ impl PieceKind {
     ///
     /// # Example
     /// ```
-    /// # use types::PieceKind;
+    /// # use chessie_types::PieceKind;
     /// let queen = PieceKind::Queen;
     /// assert_eq!(queen.name(), "queen");
     /// ```
@@ -436,7 +436,7 @@ impl PieceKind {
     ///
     /// # Example
     /// ```
-    /// # use types::PieceKind;
+    /// # use chessie_types::PieceKind;
     /// let queen = PieceKind::Queen;
     /// assert_eq!(queen.to_uci(), 'q');
     /// ```
@@ -462,7 +462,7 @@ impl PieceKind {
     ///
     /// # Example
     /// ```
-    /// # use types::PieceKind;
+    /// # use chessie_types::PieceKind;
     /// let queen = PieceKind::Queen;
     /// assert_eq!(queen.as_str(), "q");
     /// ```
@@ -519,7 +519,7 @@ impl Piece {
     ///
     /// # Example
     /// ```
-    /// # use types::{Piece, Color, PieceKind};
+    /// # use chessie_types::{Piece, Color, PieceKind};
     /// let white_knight = Piece::new(Color::White, PieceKind::Knight);
     /// assert_eq!(white_knight.to_string(), "N");
     /// ```
@@ -533,7 +533,7 @@ impl Piece {
     ///
     /// # Example
     /// ```
-    /// # use types::{Piece, Color, PieceKind};
+    /// # use chessie_types::{Piece, Color, PieceKind};
     /// let white_knight = Piece::new(Color::White, PieceKind::Knight);
     /// assert_eq!(white_knight.color(), Color::White);
     /// ```
@@ -545,7 +545,7 @@ impl Piece {
     ///
     /// # Example
     /// ```
-    /// # use types::Piece;
+    /// # use chessie_types::Piece;
     /// assert!(Piece::WHITE_KNIGHT.is_white());
     /// assert!(!Piece::BLACK_KNIGHT.is_white());
     /// ```
@@ -557,7 +557,7 @@ impl Piece {
     ///
     /// # Example
     /// ```
-    /// # use types::Piece;
+    /// # use chessie_types::Piece;
     /// assert!(Piece::BLACK_KNIGHT.is_black());
     /// assert!(!Piece::WHITE_KNIGHT.is_black());
     /// ```
@@ -569,7 +569,7 @@ impl Piece {
     ///
     /// # Example
     /// ```
-    /// # use types::{Piece, Color, PieceKind};
+    /// # use chessie_types::{Piece, Color, PieceKind};
     /// let white_knight = Piece::new(Color::White, PieceKind::Knight);
     /// assert_eq!(white_knight.kind(), PieceKind::Knight);
     /// ```
@@ -650,7 +650,7 @@ impl Piece {
     ///
     /// # Example
     /// ```
-    /// # use types::{Piece, Color, PieceKind};
+    /// # use chessie_types::{Piece, Color, PieceKind};
     /// let white_knight = Piece::from_uci('N').unwrap();
     /// assert_eq!(white_knight.color(), Color::White);
     /// assert_eq!(white_knight.kind(), PieceKind::Knight);
@@ -665,7 +665,7 @@ impl Piece {
     ///
     /// # Example
     /// ```
-    /// # use types::{Piece, Color, PieceKind};
+    /// # use chessie_types::{Piece, Color, PieceKind};
     /// let white_knight = Piece::new(Color::White, PieceKind::Knight);
     /// assert_eq!(white_knight.to_uci(), 'N');
     /// ```
@@ -686,7 +686,7 @@ impl Piece {
     ///
     /// # Example
     /// ```
-    /// # use types::Piece;
+    /// # use chessie_types::Piece;
     /// assert_eq!(Piece::WHITE_QUEEN.as_str(), "Q");
     /// assert_eq!(Piece::BLACK_PAWN.as_str(), "p");
     /// ```
@@ -715,7 +715,7 @@ impl Piece {
     ///
     /// # Example
     /// ```
-    /// # use types::{Color, Piece, PieceKind};
+    /// # use chessie_types::{Color, Piece, PieceKind};
     /// let pawn = Piece::from_uci('p').unwrap();
     /// assert_eq!(pawn.kind(), PieceKind::Pawn);
     /// assert_eq!(pawn.color(), Color::Black);
@@ -731,7 +731,7 @@ impl Piece {
     ///
     /// # Example
     /// ```
-    /// # use types::{Piece, PieceKind};
+    /// # use chessie_types::{Piece, PieceKind};
     /// let queen = Piece::from_uci('Q').unwrap();
     /// let pawn = queen.demoted();
     /// assert_eq!(pawn.kind(), PieceKind::Pawn);
@@ -744,7 +744,7 @@ impl Piece {
     ///
     /// # Example
     /// ```
-    /// # use types::{Piece, Color};
+    /// # use chessie_types::{Piece, Color};
     /// let mut king = Piece::from_uci('k').unwrap();
     /// let michael_jackson = king.inverted();
     /// assert_eq!(michael_jackson.color(), Color::White);
@@ -757,7 +757,7 @@ impl Piece {
     ///
     /// # Example
     /// ```
-    /// # use types::Piece;
+    /// # use chessie_types::Piece;
     /// let white_queen = Piece::WHITE_QUEEN;
     /// assert_eq!(white_queen.name(), "white queen");
     /// ```

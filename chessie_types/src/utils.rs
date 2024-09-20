@@ -178,14 +178,16 @@ fn generate_ray_containing_table() -> [[Bitboard; Square::COUNT]; Square::COUNT]
 ///
 /// This will produce the following 9 files located in `outdir`:
 ///
-///     rook_mobility.blob
-///     bishop_mobility.blob
-///     knight_mobility.blob
-///     king_mobility.blob
-///     white_pawn_push_mobility.blob
-///     black_pawn_push_mobility.blob
-///     white_pawn_attack_mobility.blob
-///     black_pawn_attack_mobility.blob
+/// ```text
+/// rook_mobility.blob
+/// bishop_mobility.blob
+/// knight_mobility.blob
+/// king_mobility.blob
+/// white_pawn_push_mobility.blob
+/// black_pawn_push_mobility.blob
+/// white_pawn_attack_mobility.blob
+/// black_pawn_attack_mobility.blob
+/// ```
 ///
 /// You can use `include_bytes!()` to read from these blobs like so:
 /// ```compile_fail

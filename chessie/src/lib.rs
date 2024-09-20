@@ -6,7 +6,7 @@
 
 #![doc = include_str!("../README.md")]
 
-pub use types::*;
+pub use chessie_types::*;
 
 /// High-level abstraction of the game of chess, including movable pieces, legality checks, game state, etc.
 pub mod game;

@@ -127,7 +127,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// let mut iter = Square::iter();
     /// assert_eq!(iter.len(), 64);
     /// assert_eq!(iter.next().unwrap(), Square::A1);
@@ -141,7 +141,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::{Square, File, Rank};
+    /// # use chessie_types::{Square, File, Rank};
     /// let c4 = Square::new(File::C, Rank::FOUR);
     /// assert_eq!(c4, Square::C4);
     /// ```
@@ -156,7 +156,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// let c4 = Square::from_index(26);
     /// assert!(c4.is_ok());
     /// assert_eq!(c4.unwrap(), Square::C4);
@@ -173,7 +173,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// let c4 = Square::from_index_unchecked(26);
     /// assert_eq!(c4, Square::C4);
     /// ```
@@ -188,7 +188,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// let c4 = Square::from_bits(26);
     /// assert!(c4.is_ok());
     /// assert_eq!(c4.unwrap(), Square::C4);
@@ -210,7 +210,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// let c4 = Square::from_bits_unchecked(26);
     /// assert_eq!(c4, Square::C4);
     /// ```
@@ -225,7 +225,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// assert_eq!(Square::A1.flipped(), Square::H8);
     /// assert_eq!(Square::C4.flipped(), Square::F5);
     /// ```
@@ -237,7 +237,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// assert_eq!(Square::A1.flipped_file(), Square::H1);
     /// assert_eq!(Square::C4.flipped_file(), Square::F4);
     /// ```
@@ -249,7 +249,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// assert_eq!(Square::A1.flipped_rank(), Square::A8);
     /// assert_eq!(Square::C4.flipped_rank(), Square::C5);
     /// ```
@@ -264,7 +264,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::{Color, Square};
+    /// # use chessie_types::{Color, Square};
     /// assert_eq!(Square::C4.relative_to(Color::White), Square::C4);
     /// assert_eq!(Square::C4.relative_to(Color::Black), Square::F5);
     /// ```
@@ -282,7 +282,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::{Color, Square};
+    /// # use chessie_types::{Color, Square};
     /// assert_eq!(Square::E1.rank_relative_to(Color::White), Square::E1);
     /// assert_eq!(Square::E1.rank_relative_to(Color::Black), Square::E8);
     /// ```
@@ -300,7 +300,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::{Color, Square};
+    /// # use chessie_types::{Color, Square};
     /// assert_eq!(Square::A1.file_relative_to(Color::White), Square::A1);
     /// assert_eq!(Square::A1.file_relative_to(Color::Black), Square::H1);
     /// ```
@@ -315,7 +315,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// assert_eq!(Square::A1.next(), Some(Square::B1));
     /// assert_eq!(Square::H3.next(), Some(Square::A4));
     /// assert_eq!(Square::H8.next(), None);
@@ -328,7 +328,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// assert_eq!(Square::A1.prev(), None);
     /// assert_eq!(Square::A4.prev(), Some(Square::H3));
     /// assert_eq!(Square::H8.prev(), Some(Square::G8));
@@ -341,7 +341,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// assert_eq!(Square::C4.inner(), 26);
     /// ```
     pub const fn inner(&self) -> u8 {
@@ -352,7 +352,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::{Square, File};
+    /// # use chessie_types::{Square, File};
     /// assert_eq!(Square::C4.file(), File::C);
     /// ```
     pub const fn file(&self) -> File {
@@ -363,7 +363,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::{Square, Rank};
+    /// # use chessie_types::{Square, Rank};
     /// assert_eq!(Square::C4.rank(), Rank::FOUR);
     /// ```
     pub const fn rank(&self) -> Rank {
@@ -374,7 +374,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::{Square, File, Rank};
+    /// # use chessie_types::{Square, File, Rank};
     /// assert_eq!(Square::C4.parts(), (File::C, Rank::FOUR));
     /// ```
     pub const fn parts(&self) -> (File, Rank) {
@@ -387,7 +387,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// assert_eq!(Square::C4.index(), 26);
     /// ```
     pub const fn index(&self) -> usize {
@@ -401,7 +401,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::{Color, Square};
+    /// # use chessie_types::{Color, Square};
     /// assert_eq!(Square::C4.color(), Color::White);
     /// assert_eq!(Square::C5.color(), Color::Black);
     /// ```
@@ -413,7 +413,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// assert!(Square::C4.is_light());
     /// ```
     pub const fn is_light(&self) -> bool {
@@ -424,7 +424,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// assert!(Square::C5.is_dark());
     /// ```
     pub const fn is_dark(&self) -> bool {
@@ -435,7 +435,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// assert_eq!(Square::C5.distance_files(Square::C2), 0);
     /// assert_eq!(Square::C5.distance_files(Square::B2), 1);
     /// assert_eq!(Square::A1.distance_files(Square::H1), 7);
@@ -448,7 +448,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// assert_eq!(Square::C5.distance_ranks(Square::B5), 0);
     /// assert_eq!(Square::C5.distance_ranks(Square::C4), 1);
     /// assert_eq!(Square::A1.distance_ranks(Square::A8), 7);
@@ -461,7 +461,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// assert_eq!(Square::C5.distance_manhattan(Square::C5), 0);
     /// assert_eq!(Square::C5.distance_manhattan(Square::B5), 1);
     /// assert_eq!(Square::C5.distance_manhattan(Square::B4), 2);
@@ -475,7 +475,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// assert_eq!(Square::C5.distance_chebyshev(Square::C5), 0);
     /// assert_eq!(Square::C5.distance_chebyshev(Square::B5), 1);
     /// assert_eq!(Square::C5.distance_chebyshev(Square::B4), 1);
@@ -495,7 +495,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// assert_eq!(Square::C5.is_diagonal_to(Square::A3), true);
     /// assert_eq!(Square::H1.is_diagonal_to(Square::A8), true);
     /// assert_eq!(Square::F7.is_diagonal_to(Square::F7), true);
@@ -517,7 +517,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// let c4 = Square::from_uci("c4");
     /// assert!(c4.is_ok());
     /// assert_eq!(c4.unwrap(), Square::C4);
@@ -540,7 +540,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// assert_eq!("c4", Square::C4.to_uci());
     /// ```
     pub fn to_uci(self) -> String {
@@ -556,7 +556,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// assert_eq!(Square::C4.distance_to(Square::C1), 3);
     /// assert_eq!(Square::A1.distance_to(Square::A8), 7);
     /// assert_eq!(Square::D6.distance_to(Square::D6), 0);
@@ -572,7 +572,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// assert_eq!(Square::D5.distance_from_center(), 0);
     /// assert_eq!(Square::E4.distance_from_center(), 0);
     /// assert_eq!(Square::A1.distance_from_center(), 6);
@@ -589,7 +589,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::Square;
+    /// # use chessie_types::Square;
     /// assert_eq!(Square::C4.offset(1, 1), Some(Square::D5));
     /// assert_eq!(Square::C4.offset(-1, -1), Some(Square::B3));
     /// assert_eq!(Square::A1.offset(-1, -1), None);
@@ -607,7 +607,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::{Square, Color};
+    /// # use chessie_types::{Square, Color};
     /// assert_eq!(Square::C4.forward_by(Color::White, 1), Some(Square::C5));
     /// assert_eq!(Square::C4.forward_by(Color::Black, 1), Some(Square::C3));
     /// ```
@@ -621,7 +621,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::{Square, Color};
+    /// # use chessie_types::{Square, Color};
     /// assert_eq!(Square::C4.backward_by(Color::White, 1), Some(Square::C3));
     /// assert_eq!(Square::C4.backward_by(Color::Black, 1), Some(Square::C5));
     /// ```
@@ -635,7 +635,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::{Square, Color};
+    /// # use chessie_types::{Square, Color};
     /// assert_eq!(Square::C4.right_by(Color::White, 1), Some(Square::D4));
     /// assert_eq!(Square::C4.right_by(Color::Black, 1), Some(Square::B4));
     /// ```
@@ -649,7 +649,7 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// # use types::{Square, Color};
+    /// # use chessie_types::{Square, Color};
     /// assert_eq!(Square::C4.left_by(Color::White, 1), Some(Square::B4));
     /// assert_eq!(Square::C4.left_by(Color::Black, 1), Some(Square::D4));
     /// ```
@@ -834,7 +834,7 @@ impl Rank {
     ///
     /// # Example
     /// ```
-    /// # use types::Rank;
+    /// # use chessie_types::Rank;
     /// let mut iter = Rank::iter();
     /// assert_eq!(iter.len(), 8);
     /// assert_eq!(iter.next().unwrap(), Rank::ONE);
@@ -957,7 +957,7 @@ impl Rank {
     ///
     /// # Example
     /// ```
-    /// # use types::Rank;
+    /// # use chessie_types::Rank;
     /// assert_eq!(Rank::FOUR.offset(1), Some(Rank::FIVE));
     /// assert_eq!(Rank::FOUR.offset(-1), Some(Rank::THREE));
     /// assert_eq!(Rank::ONE.offset(-1), None);
@@ -985,7 +985,7 @@ impl Rank {
     ///
     /// # Example
     /// ```
-    /// # use types::Rank;
+    /// # use chessie_types::Rank;
     /// assert_eq!(Rank::SEVEN.abs_diff(Rank::FIVE), 2);
     /// ```
     pub const fn abs_diff(&self, other: Self) -> u8 {
@@ -1210,7 +1210,7 @@ impl File {
     ///
     /// # Example
     /// ```
-    /// # use types::File;
+    /// # use chessie_types::File;
     /// let mut iter = File::iter();
     /// assert_eq!(iter.len(), 8);
     /// assert_eq!(iter.next().unwrap(), File::A);
@@ -1303,7 +1303,7 @@ impl File {
     ///
     /// # Example
     /// ```
-    /// # use types::File;
+    /// # use chessie_types::File;
     /// assert_eq!(File::C.offset(1), Some(File::D));
     /// assert_eq!(File::C.offset(-1), Some(File::B));
     /// assert_eq!(File::A.offset(-1), None);
@@ -1331,7 +1331,7 @@ impl File {
     ///
     /// # Example
     /// ```
-    /// # use types::File;
+    /// # use chessie_types::File;
     /// assert_eq!(File::B.abs_diff(File::H), 6);
     /// ```
     pub const fn abs_diff(&self, other: Self) -> u8 {

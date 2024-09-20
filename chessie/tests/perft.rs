@@ -24,7 +24,6 @@ fn test_standard_epd() {
         for perft_data in parts {
             let depth = usize::from_str_radix(perft_data.get(1..2).unwrap().trim(), 10).unwrap();
             let expected = u64::from_str_radix(perft_data.get(3..).unwrap().trim(), 10).unwrap();
-            // println!("perft({depth}, \"{fen}\") := {expected}");
 
             let mut position = Game::from_fen(fen).unwrap();
 
@@ -36,67 +35,6 @@ fn test_standard_epd() {
             );
         }
     }
-}
-
-#[cfg(test)]
-mod kiwipete_perft {
-
-    use super::*;
-
-    #[test]
-    fn kiwipete_perft_1() {
-        test_perft_fen_nodes(
-            1,
-            "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 ",
-            48,
-        );
-    }
-
-    #[test]
-    fn kiwipete_perft_2() {
-        test_perft_fen_nodes(
-            2,
-            "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
-            2039,
-        );
-    }
-
-    #[test]
-    fn kiwipete_perft_3() {
-        test_perft_fen_nodes(
-            3,
-            "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
-            97862,
-        );
-    }
-
-    #[test]
-    fn kiwipete_perft_4() {
-        test_perft_fen_nodes(
-            4,
-            "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
-            4085603,
-        );
-    }
-    #[test]
-    fn kiwipete_perft_5() {
-        test_perft_fen_nodes(
-            5,
-            "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 ",
-            193690690,
-        );
-    }
-
-    /*
-    #[test]
-    fn kiwipete_perft_6() {
-        test_perft_fen_nodes(
-            6,
-            "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 ",
-            8031647685,
-        );
-    }
-     */
 }
 
 #[cfg(test)]
@@ -130,39 +68,6 @@ mod promotion_perft {
     }
 }
 
-/*
-#[test]
-fn perft_0() {
-    test_starting_pos_perft(0);
-}
-
-#[test]
-fn perft_1() {
-    test_starting_pos_perft(1);
-}
-
-#[test]
-fn perft_2() {
-    test_starting_pos_perft(2);
-}
-
-#[test]
-fn perft_3() {
-    test_starting_pos_perft(3);
-}
-
-#[test]
-fn perft_4() {
-    test_starting_pos_perft(4);
-}
-
-#[test]
-fn perft_5() {
-    test_starting_pos_perft(5);
-}
-
- */
-
 /// https://www.chessprogramming.net/perfect-perft/
 #[cfg(test)]
 mod simple_perfts {
@@ -186,19 +91,19 @@ mod simple_perfts {
         );
     }
 
-    // #[test]
-    // fn test_simple_perft_3() {
-    //     test_perft_fen_nodes(7, "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -", 178633661);
-    // }
+    #[test]
+    fn test_simple_perft_3() {
+        test_perft_fen_nodes(7, "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -", 178633661);
+    }
 
-    // #[test]
-    // fn test_simple_perft_4() {
-    //     test_perft_fen_nodes(
-    //         6,
-    //         "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
-    //         706045033,
-    //     );
-    // }
+    #[test]
+    fn test_simple_perft_4() {
+        test_perft_fen_nodes(
+            6,
+            "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
+            706045033,
+        );
+    }
 
     #[test]
     fn test_simple_perft_5() {
