@@ -791,6 +791,7 @@ impl fmt::Debug for Square {
     }
 }
 
+/// Represents one of eight ranks on a chess board.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[repr(transparent)]
 pub struct Rank(pub(crate) u8);
@@ -1166,7 +1167,9 @@ impl fmt::Debug for Rank {
     }
 }
 
+/// Represents one of eight ranks on a chess board.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[repr(transparent)]
 pub struct File(pub(crate) u8);
 
 impl File {

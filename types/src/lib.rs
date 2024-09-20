@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 /// All things related to Bitboards.
 pub mod bitboard;
 /// Enums for piece kinds, colors, and a struct for a chess piece.

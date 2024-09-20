@@ -261,7 +261,9 @@ impl Neg for Color {
     }
 }
 
-/// Represents the kind (or "class") that a chess piece can be.
+/// Represents the kind (or "role") that a chess piece can be.
+///
+/// These have no [`Color`] associated with them. See [`Piece`].
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum PieceKind {

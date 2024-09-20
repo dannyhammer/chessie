@@ -1,8 +1,8 @@
+#![doc = include_str!("../README.md")]
+
 pub use types::*;
 
 /// High-level abstraction of the game of chess, including movable pieces, legality checks, game state, etc.
-///
-/// You probably want to look here.
 pub mod game;
 /// All code related to generating moves (legal and pseudo-legal) for pieces on a board.
 pub mod movegen;

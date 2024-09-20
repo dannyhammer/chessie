@@ -47,7 +47,7 @@ pub struct Game {
 }
 
 impl Game {
-    /// Creates a new, empty [`Game`].
+    /// Creates a new [`Game`] from  the provided [`Position`].
     pub fn new(position: Position) -> Self {
         /*
         // Compute attack/defend maps by square and color
@@ -93,9 +93,9 @@ impl Game {
         cloned
     }
 
-    /// Returns `true` if the game is in a position that is identical to the position it was in before.
+    /// Returns `true` if the game is in a position that is identical to a position it has been in before.
     ///
-    /// This is for checking "two-fold" repetition.
+    /// This is useful for checking repetitions.
     ///
     ///
     /// # Example

@@ -1,9 +1,9 @@
 use std::path::Path;
 
-use super::{Bitboard, Color, Rank, Square};
-
 use anyhow::{bail, Result};
 use rand::random;
+
+use super::{Bitboard, Color, Rank, Square};
 
 /// FEN string for the starting position of chess.
 pub const FEN_STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -66,7 +66,7 @@ pub const KNIGHT_DELTAS: [(i8, i8); 8] = [
 
 /// Generates `.dat` files for ray tables.
 ///
-/// See `ray_containing` and others for more details in `brogle_core`.
+/// See the `ray_containing` and `ray_between` functions in the `chessie` crate for more details.
 pub fn generate_ray_table_datfiles<P: AsRef<Path>>(outdir: P) -> std::io::Result<()> {
     // 64 * 64 * 8 = 32,768
     // 2D Bitboard array being cast to u8 (8 u8 in a u64)
@@ -171,18 +171,19 @@ fn generate_ray_containing_table() -> [[Bitboard; Square::COUNT]; Square::COUNT]
 /// Generates the default mobility for each of the pieces of standard chess, and writes the mobility to new files created in `outdir`.
 ///
 /// This will produce the following 9 files located in `outdir`:
-///     * `rook_mobility.blob`
-///     * `bishop_mobility.blob`
-///     * `knight_mobility.blob`
-///     * `king_mobility.blob`
-///     * `white_pawn_push_mobility.blob`
-///     * `black_pawn_push_mobility.blob`
-///     * `white_pawn_attack_mobility.blob`
-///     * `black_pawn_attack_mobility.blob`
+///
+///     rook_mobility.blob
+///     bishop_mobility.blob
+///     knight_mobility.blob
+///     king_mobility.blob
+///     white_pawn_push_mobility.blob
+///     black_pawn_push_mobility.blob
+///     white_pawn_attack_mobility.blob
+///     black_pawn_attack_mobility.blob
 ///
 /// You can use `include_bytes!()` to read from these blobs like so:
 /// ```compile_fail
-/// const KNIGHT_MOVES: [Bitboard; 64] = unsafe { std::mem::transmute(*include_bytes!("knight_mobility.blob")) };
+/// const KNIGHT_MOVES: [Bitboard; 64] = unsafe { std::mem::transmute(*include_bytes!("<outdir>/knight_mobility.blob")) };
 /// ```
 pub fn generate_piece_attack_datfiles<P: AsRef<Path>>(outdir: P) -> std::io::Result<()> {
     // Generate the blobs

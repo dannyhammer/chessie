@@ -940,6 +940,9 @@ impl fmt::Debug for Bitboard {
     }
 }
 
+/// An iterator over all set bits in a [`Bitboard`].
+///
+/// See [`Bitboard::iter`].
 pub struct BitboardIter {
     bitboard: Bitboard,
 }
