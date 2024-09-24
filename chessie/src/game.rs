@@ -11,6 +11,9 @@ use std::{
 };
 
 use anyhow::Result;
+use chessie_types::Rank;
+
+use crate::MoveKind;
 
 use super::{
     attacks_for, bishop_attacks, compute_attacks_to, compute_pinmask_for, king_attacks,
@@ -181,21 +184,167 @@ impl Game {
     }
 
     /// Generate all legal moves from the current position.
+    ///
+    /// If you need all moves
     pub fn get_legal_moves(&self) -> MoveList {
-        self.iter().collect()
+        let mut moves = MoveList::default();
+        match self.checkers().population() {
+            0 => self.generate_all_moves::<false>(&mut moves),
+            1 => self.generate_all_moves::<true>(&mut moves),
+            // If we're in double check, we can only move the King
+            _ => self.generate_king_moves::<true>(&mut moves),
+        }
+        moves
     }
 
+    fn generate_all_moves<const IN_CHECK: bool>(&self, moves: &mut MoveList) {
+        self.generate_pawn_moves::<IN_CHECK>(moves);
+        self.generate_knight_moves::<IN_CHECK>(moves);
+        self.generate_bishop_moves::<IN_CHECK>(moves);
+        self.generate_rook_moves::<IN_CHECK>(moves);
+        self.generate_king_moves::<IN_CHECK>(moves);
+    }
+
+    fn generate_pawn_moves<const IN_CHECK: bool>(&self, moves: &mut MoveList) {
+        let color = self.side_to_move();
+        for from in self.pawns(color) {
+            let mobility = self.generate_legal_pawn_mobility(color, from);
+
+            for to in mobility {
+                let mut kind = if self.has(to) {
+                    MoveKind::Capture
+                } else {
+                    MoveKind::Quiet
+                };
+
+                if to.rank() == Rank::eighth(color) {
+                    // If this move also captures, it's a capture-promote
+                    if kind == MoveKind::Capture {
+                        moves.push(Move::new(from, to, MoveKind::CaptureAndPromoteKnight));
+                        moves.push(Move::new(from, to, MoveKind::CaptureAndPromoteBishop));
+                        moves.push(Move::new(from, to, MoveKind::CaptureAndPromoteRook));
+                        kind = MoveKind::CaptureAndPromoteQueen;
+                    } else {
+                        moves.push(Move::new(from, to, MoveKind::PromoteKnight));
+                        moves.push(Move::new(from, to, MoveKind::PromoteBishop));
+                        moves.push(Move::new(from, to, MoveKind::PromoteRook));
+                        kind = MoveKind::PromoteQueen;
+                    }
+                }
+                // If this pawn is moving to the en passant square, it's en passant
+                else if Some(to) == self.ep_square() {
+                    kind = MoveKind::EnPassantCapture;
+                }
+                // If the Pawn is moving two ranks, it's a double push
+                else if from.rank().abs_diff(to.rank()) == 2 {
+                    kind = MoveKind::PawnDoublePush;
+                }
+
+                let mv = Move::new(from, to, kind);
+                moves.push(mv);
+            }
+        }
+    }
+
+    fn generate_knight_moves<const IN_CHECK: bool>(&self, moves: &mut MoveList) {
+        let color = self.side_to_move();
+        for from in self.knights(color) {
+            let attacks = knight_attacks(from);
+            let mobility = self.generate_legal_normal_piece_mobility(from, attacks);
+
+            for to in mobility {
+                let kind = if self.has(to) {
+                    MoveKind::Capture
+                } else {
+                    MoveKind::Quiet
+                };
+
+                let mv = Move::new(from, to, kind);
+                moves.push(mv);
+            }
+        }
+    }
+
+    fn generate_bishop_moves<const IN_CHECK: bool>(&self, moves: &mut MoveList) {
+        let color = self.side_to_move();
+        let blockers = self.occupied();
+        for from in self.diagonal_sliders(color) {
+            let attacks = bishop_attacks(from, blockers);
+            let mobility = self.generate_legal_normal_piece_mobility(from, attacks);
+
+            for to in mobility {
+                let kind = if self.has(to) {
+                    MoveKind::Capture
+                } else {
+                    MoveKind::Quiet
+                };
+
+                let mv = Move::new(from, to, kind);
+                moves.push(mv);
+            }
+        }
+    }
+
+    fn generate_rook_moves<const IN_CHECK: bool>(&self, moves: &mut MoveList) {
+        let color = self.side_to_move();
+        let blockers = self.occupied();
+        for from in self.orthogonal_sliders(color) {
+            let attacks = rook_attacks(from, blockers);
+            let mobility = self.generate_legal_normal_piece_mobility(from, attacks);
+
+            for to in mobility {
+                let kind = if self.has(to) {
+                    MoveKind::Capture
+                } else {
+                    MoveKind::Quiet
+                };
+
+                let mv = Move::new(from, to, kind);
+                moves.push(mv);
+            }
+        }
+    }
+
+    fn generate_king_moves<const IN_CHECK: bool>(&self, moves: &mut MoveList) {
+        let from = self.king_square;
+        let color = self.side_to_move();
+        for to in self.generate_legal_king_mobility(color, from) {
+            let mut kind = if self.has(to) {
+                MoveKind::Capture
+            } else {
+                MoveKind::Quiet
+            };
+
+            if from == Square::E1.rank_relative_to(color) {
+                if to == Square::G1.rank_relative_to(color) {
+                    kind = MoveKind::ShortCastle;
+                } else if to == Square::C1.rank_relative_to(color) {
+                    kind = MoveKind::LongCastle;
+                }
+            }
+
+            let mv = Move::new(from, to, kind);
+            moves.push(mv);
+        }
+    }
+
+    /*
     /// Generate all legal captures from the current position.
+    ///
+    /// **Note**: This does not include en passant, for simplicity
     pub fn get_legal_captures(&self) -> MoveList {
         self.iter().only_captures().collect()
     }
+     */
 
+    /*
     /// Yields a [`MoveGenIter`] to iterate over all legal moves available in the current position.
     ///
     /// If your intent is to search _every_ available move, use [`Game::get_legal_moves`] instead.
     pub fn iter(&self) -> MoveGenIter {
         MoveGenIter::new(self)
     }
+     */
 
     /*
     // TODO: https://github.com/dannyhammer/brogle/issues/9
@@ -294,7 +443,8 @@ impl Game {
     pub fn compute_attacks_by(&self, color: Color) -> Bitboard {
         let mut attacks = Bitboard::default();
         let blockers = self.occupied();
-        for (square, piece) in self.all_for(color) {
+        let color_mask = self.color(color);
+        for (square, piece) in self.iter_for(color_mask) {
             attacks |= attacks_for(piece, square, blockers);
         }
         attacks
@@ -418,7 +568,7 @@ impl Game {
         let safe_squares = !(enemy_attacks | self.discoverable_checks); // Not attacked by the enemy (even after King retreats)
 
         // All legal attacks that are safe and not on friendly squares
-        (attacks | castling) & safe_squares
+        (attacks | castling) & safe_squares & self.enemy_or_empty(color)
     }
 
     /// Generate a bitboard for `color`'s ability to castle with the Rook on `rook_square`, which will place the King on `dst_square`.

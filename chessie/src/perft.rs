@@ -157,7 +157,7 @@ pub fn print_perft<const PRETTY: bool, const SPLIT: bool>(game: &Game, depth: us
     let now = Instant::now();
     let total_nodes = if SPLIT {
         let mut total_nodes = 0;
-        for mv in game.iter() {
+        for mv in game.get_legal_moves() {
             let nodes = perft(&game.with_move_made(mv), depth - 1);
 
             println!("{mv}\t{nodes}");
@@ -223,8 +223,7 @@ pub fn perft_full(position: &Position, depth: usize) -> PerftResult {
 pub fn perft(game: &Game, depth: usize) -> u64 {
     // Bulk counting; no need to recurse again just to apply a singular move and return 1.
     if depth == 1 {
-        let moves = game.get_legal_moves();
-        return moves.len() as u64;
+        return game.get_legal_moves().len() as u64;
     }
     // Recursion limit; return 1, since we're fathoming this node.
     else if depth == 0 {
@@ -232,7 +231,7 @@ pub fn perft(game: &Game, depth: usize) -> u64 {
     }
 
     // Recursively accumulate the nodes from the remaining depths
-    game.iter().fold(0, |nodes, mv| {
+    game.get_legal_moves().into_iter().fold(0, |nodes, mv| {
         nodes + perft(&game.with_move_made(mv), depth - 1)
     })
 }

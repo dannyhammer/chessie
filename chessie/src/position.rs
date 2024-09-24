@@ -928,19 +928,11 @@ impl Board {
         }
     }
 
-    /// Returns an iterator over all of the pieces of `kind` on this board along with their corresponding locations.
-    pub const fn all_of(&self, kind: PieceKind) -> BoardIter<'_> {
+    /// Returns an iterator over all of the pieces in `mask` on this board along with their corresponding locations.
+    pub const fn iter_for(&self, mask: Bitboard) -> BoardIter<'_> {
         BoardIter {
             board: self,
-            occupancy: self.kind(kind),
-        }
-    }
-
-    /// Returns an iterator over all of the pieces of `color` on this board along with their corresponding locations.
-    pub const fn all_for(&self, color: Color) -> BoardIter<'_> {
-        BoardIter {
-            board: self,
-            occupancy: self.color(color),
+            occupancy: mask,
         }
     }
 

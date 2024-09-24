@@ -163,6 +163,8 @@ impl<'a> MoveGenIter<'a> {
     }
 
     /// Consumes `self`, returning a [`MoveGenIter`] that only generates moves that capture enemy pieces.
+    ///
+    /// **Note**: This does not include en passant, for simplicity
     pub fn only_captures(self) -> Self {
         let opponent = self.game.side_to_move().opponent();
         let mask = self.game.color(opponent);
