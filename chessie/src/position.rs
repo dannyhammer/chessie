@@ -16,22 +16,36 @@ use super::{
     Bitboard, Color, File, Move, MoveKind, Piece, PieceKind, Rank, Square, ZobristKey, FEN_STARTPOS,
 };
 
-// TODO: Refactor this to be Option<square> instead of bool arrays
-/// Represents the castling rights of both players
+/// Represents the castling rights of a single player
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Default)]
 pub struct CastlingRights {
-    /// If a right is `Some(square)`, then `square` is the *rook*'s location
-    pub(crate) short: Option<Square>,
-    pub(crate) long: Option<Square>,
+    /// If a right is `Some(file)`, then `file` is the *rook*'s location
+    pub(crate) short: Option<File>,
+    pub(crate) long: Option<File>,
 }
 
 impl CastlingRights {
+    /// Creates a new [`CastlingRights`] that permits castling to the provided sides.
     #[inline(always)]
-    pub const fn new() -> Self {
-        Self {
-            short: None,
-            long: None,
-        }
+    pub const fn new(short: Option<File>, long: Option<File>) -> Self {
+        Self { short, long }
+    }
+
+    /// Creates a new [`CastlingRights`] from part of a FEN string.
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie::*;
+    /// let rights = CastlingRights::new(Some(File::H), Some(File::A));
+    ///
+    /// assert_eq!(CastlingRights::from_uci("KQ").unwrap(), rights);
+    /// assert_eq!(CastlingRights::from_uci("kq").unwrap(), rights);
+    /// ```
+    pub fn from_uci(uci: &str) -> Result<Self> {
+        let short = uci.contains(['K', 'k']).then_some(File::H);
+        let long = uci.contains(['Q', 'q']).then_some(File::A);
+
+        Ok(Self::new(short, long))
     }
 
     /// Creates a `usize` for indexing into lists of 4 elements.
@@ -40,6 +54,13 @@ impl CastlingRights {
     #[inline(always)]
     pub(crate) const fn index(&self) -> usize {
         (self.short.is_some() as usize) | (self.long.is_some() as usize) << 1
+    }
+}
+
+impl FromStr for CastlingRights {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        Self::from_uci(s)
     }
 }
 
@@ -61,11 +82,13 @@ pub struct Position {
     ep_square: Option<Square>,
 
     /// Used to enforce the fifty-move rule.
+    ///
     /// - Incremented after each move.
     /// - Reset after a capture or a pawn moves.
     halfmove: usize,
 
     /// Number of moves since the beginning of the game.
+    ///
     /// A fullmove is a complete turn by white and then by black.
     fullmove: usize,
 
@@ -90,7 +113,7 @@ impl Position {
     /// ```
     pub fn new() -> Self {
         let board = Board::new();
-        let castling_rights = [CastlingRights::new(); Color::COUNT];
+        let castling_rights = [CastlingRights::default(); Color::COUNT];
         let current_player = Color::White;
         let ep_square = None;
 
@@ -122,10 +145,10 @@ impl Position {
         // Castling is a bit more complicated; especially for Chess960
         let castling = split.next().unwrap_or("KQkq");
         if castling.contains(['K', 'k', 'Q', 'q']) {
-            pos.castling_rights[Color::White].short = castling.contains('K').then_some(Square::H1);
-            pos.castling_rights[Color::White].long = castling.contains('Q').then_some(Square::A1);
-            pos.castling_rights[Color::Black].short = castling.contains('k').then_some(Square::H8);
-            pos.castling_rights[Color::Black].long = castling.contains('q').then_some(Square::A8);
+            pos.castling_rights[Color::White].short = castling.contains('K').then_some(File::H);
+            pos.castling_rights[Color::White].long = castling.contains('Q').then_some(File::A);
+            pos.castling_rights[Color::Black].short = castling.contains('k').then_some(File::H);
+            pos.castling_rights[Color::Black].long = castling.contains('q').then_some(File::A);
         } else if castling.chars().any(|c| File::from_char(c).is_ok()) {
             eprintln!("Warning: Chess960 FEN detected for castling rights: {castling:?}");
             eprintln!("Chess960 is not currently supported");
@@ -168,11 +191,12 @@ impl Position {
         Ok(pos)
     }
 
-    /// Consumes `self` and returns a [`Position`] after having applied the provided [`Move`].
+    /// Copies `self` and returns a [`Position`] after having applied the provided [`Move`].
     #[inline(always)]
-    pub fn with_move_made(mut self, mv: Move) -> Self {
-        self.make_move(mv);
-        self
+    pub fn with_move_made(&self, mv: Move) -> Self {
+        let mut copied = *self;
+        copied.make_move(mv);
+        copied
     }
 
     /// Generates a FEN string from this [`Position`].
@@ -180,26 +204,7 @@ impl Position {
         let placements = self.board().to_fen();
         let active_color = self.side_to_move();
 
-        // Castling rights done individually
-        let mut castling = String::with_capacity(4);
-
-        if self.castling_rights()[Color::White].short.is_some() {
-            castling.push('K');
-        }
-        if self.castling_rights()[Color::White].long.is_some() {
-            castling.push('Q');
-        }
-        if self.castling_rights()[Color::Black].short.is_some() {
-            castling.push('k');
-        }
-        if self.castling_rights()[Color::Black].long.is_some() {
-            castling.push('q');
-        }
-
-        // If no side can castle, use a hyphen
-        if castling.is_empty() {
-            castling = String::from("-");
-        }
+        let castling = self.castling_rights_uci();
 
         let en_passant_target = if let Some(square) = self.ep_square {
             square.to_string()
@@ -242,6 +247,31 @@ impl Position {
     #[inline(always)]
     pub const fn castling_rights_for(&self, color: Color) -> &CastlingRights {
         &self.castling_rights[color.index()]
+    }
+
+    /// Returns the [`CastlingRights`] of the current position.
+    pub fn castling_rights_uci(&self) -> String {
+        // Castling rights done individually
+        let mut castling = String::with_capacity(4);
+
+        if self.castling_rights()[Color::White].short.is_some() {
+            castling.push('K');
+        }
+        if self.castling_rights()[Color::White].long.is_some() {
+            castling.push('Q');
+        }
+        if self.castling_rights()[Color::Black].short.is_some() {
+            castling.push('k');
+        }
+        if self.castling_rights()[Color::Black].long.is_some() {
+            castling.push('q');
+        }
+
+        // If no side can castle, use a hyphen
+        if castling.is_empty() {
+            castling = String::from("-");
+        }
+        castling
     }
 
     /// Returns the half-move counter of the current position.
@@ -294,21 +324,23 @@ impl Position {
             || self.castling_rights()[color.index()].long.is_some()
     }
 
-    /// Two positions are considered repetitions if they share the same piece layout, castling rights, and en passant square.
-    ///
+    /// According to [FIDE](https://en.wikipedia.org/wiki/Threefold_repetition#Statement_of_the_rule) rules,
+    /// two positions are considered the same if they share the same piece layout, castling rights, and en passant square.
     /// Fullmove and Halfmove clocks are ignored.
-    pub fn is_repetition_of(&self, other: &Self) -> bool {
-        self.board() == other.board()
-            && self.side_to_move() == other.side_to_move()
-            && self.castling_rights() == other.castling_rights()
+    ///
+    /// This does _not_ check the [`ZobristKey`] of each [`Position`].
+    pub fn is_same_as(&self, other: &Self) -> bool {
+        self.side_to_move() == other.side_to_move()
             && self.ep_square() == other.ep_square()
+            && self.castling_rights() == other.castling_rights()
+            && self.board() == other.board()
     }
 
-    /// Checks if the provided move is legal to perform.
+    /// Checks if the provided move is pseudo-legal to perform.
     ///
     /// If `Ok()`, the move is legal.
     /// If `Err(msg)`, then `msg` will be a reason as to why it's not legal.
-    pub fn check_legality_of(&self, mv: Move) -> Result<()> {
+    pub fn check_pseudo_legality_of(&self, mv: Move) -> Result<()> {
         let (from, to, kind) = mv.parts();
 
         // If there's no piece here, illegal move
@@ -365,13 +397,6 @@ impl Position {
         Ok(())
     }
 
-    /// Applies the move, if it is legal to make. If it is not legal, returns an `Err` explaining why.
-    pub fn make_move_checked(&mut self, mv: Move) -> Result<()> {
-        self.check_legality_of(mv)?;
-        self.make_move(mv);
-        Ok(())
-    }
-
     /// Apply the provided `moves` to the board. No enforcement of legality.
     #[inline(always)]
     pub fn make_moves(&mut self, moves: impl IntoIterator<Item = Move>) {
@@ -397,8 +422,10 @@ impl Position {
         // Clear the EP square from the last move (and un-hash it)
         self.key.hash_optional_ep_square(self.ep_square.take());
 
-        // Un-hash the castling rights
-        self.key.hash_castling_rights(&self.castling_rights);
+        // Take away and un-hash the castling rights
+        let mut rights = self.castling_rights;
+        self.key.hash_castling_rights(&rights);
+        // self.key.hash_castling_rights(rights, color);
 
         // Increment move counters
         self.halfmove += 1; // This is reset if a capture occurs or a pawn moves
@@ -419,16 +446,13 @@ impl Position {
             let captured_color = captured.color();
 
             // If the capture was on a rook's starting square, disable that side's castling.
-            // Either a rook was captured, or there wasn't a rook there, in which case castling on that side is already disabled
-            // TODO: Chess960
-            if to == Square::A1.rank_relative_to(captured_color) {
-                self.key.hash_castling_rights(&self.castling_rights);
-                self.castling_rights[captured_color].long.take();
-                self.key.hash_castling_rights(&self.castling_rights);
-            } else if to == Square::H1.rank_relative_to(captured_color) {
-                self.key.hash_castling_rights(&self.castling_rights);
-                self.castling_rights[captured_color].short.take();
-                self.key.hash_castling_rights(&self.castling_rights);
+            if to.rank() == Rank::first(captured_color) {
+                // Either a rook was captured, or there wasn't a rook there, in which case castling on that side is already disabled
+                if rights[captured_color].long.is_some_and(|f| to.file() == f) {
+                    rights[captured_color].long.take();
+                } else if rights[captured_color].short.is_some_and(|f| to.file() == f) {
+                    rights[captured_color].short.take();
+                }
             }
 
             // Reset halfmove counter, since a capture occurred
@@ -448,11 +472,8 @@ impl Position {
             self.board_mut().place(rook, new_rook_square);
 
             // Disable castling
-            // Hashing must be done before and after castling rights are changed so that the proper hash key is used
-            self.key.hash_castling_rights(&self.castling_rights);
-            self.castling_rights[color].short = None;
-            self.castling_rights[color].long = None;
-            self.key.hash_castling_rights(&self.castling_rights);
+            rights[color].short = None;
+            rights[color].long = None;
         }
 
         // Next, handle special cases for Pawn (halfmove), Rook, and King (castling)
@@ -461,21 +482,15 @@ impl Position {
             PieceKind::Rook => {
                 // Disable castling if a rook moved
                 if from == Square::A1.rank_relative_to(color) {
-                    self.key.hash_castling_rights(&self.castling_rights);
-                    self.castling_rights[color].long.take();
-                    self.key.hash_castling_rights(&self.castling_rights);
+                    rights[color].long.take();
                 } else if from == Square::H1.rank_relative_to(color) {
-                    self.key.hash_castling_rights(&self.castling_rights);
-                    self.castling_rights[color].short.take();
-                    self.key.hash_castling_rights(&self.castling_rights);
+                    rights[color].short.take();
                 }
             }
             PieceKind::King => {
                 // Disable all castling
-                self.key.hash_castling_rights(&self.castling_rights);
-                self.castling_rights[color].short = None;
-                self.castling_rights[color].long = None;
-                self.key.hash_castling_rights(&self.castling_rights);
+                rights[color].short = None;
+                rights[color].long = None;
             }
             _ => {}
         }
@@ -484,6 +499,10 @@ impl Position {
         if let Some(promotion) = mv.promotion() {
             piece = piece.promoted(promotion);
         }
+
+        // Re-set and re-hash the castling rights
+        self.key.hash_castling_rights(&rights);
+        self.castling_rights = rights;
 
         // Place the piece in it's new position
         self.board_mut().place(piece, to);
@@ -1199,3 +1218,217 @@ impl<'a> Iterator for BoardIter<'a> {
 }
 
 impl<'a> ExactSizeIterator for BoardIter<'a> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_zobrist_key_side_to_move() {
+        let fen = "r3k2r/pppp1ppp/8/4p3/8/8/PPPPPPPP/R3K2R w KQkq e6 0 1";
+        let pos = Position::from_fen(fen).unwrap();
+
+        let fen_black = "r3k2r/pppp1ppp/8/4p3/8/8/PPPPPPPP/R3K2R b KQkq - 0 1";
+        let pos_black = Position::from_fen(fen_black).unwrap();
+
+        assert_ne!(pos.key(), pos_black.key());
+    }
+
+    #[test]
+    fn test_zobrist_key_ep() {
+        let fen = "r3k2r/pppp1ppp/8/4p3/8/8/PPPPPPPP/R3K2R w KQkq e6 0 1";
+        let pos = Position::from_fen(fen).unwrap();
+
+        let fen_without_ep = "r3k2r/pppp1ppp/8/4p3/8/8/PPPPPPPP/R3K2R w KQkq - 0 1";
+        let pos_without_ep = Position::from_fen(fen_without_ep).unwrap();
+
+        assert_ne!(pos.key(), pos_without_ep.key());
+    }
+
+    #[test]
+    fn test_zobrist_key_castling() {
+        let fen = "r3k2r/pppp1ppp/8/4p3/8/8/PPPPPPPP/R3K2R w KQkq e6 0 1";
+        let pos = Position::from_fen(fen).unwrap();
+
+        let fen_without_k = "r3k2r/pppp1ppp/8/4p3/8/8/PPPPPPPP/R3K2R w KQq - 0 1";
+        let pos_without_k = Position::from_fen(fen_without_k).unwrap();
+
+        assert_ne!(pos.key(), pos_without_k.key());
+    }
+
+    #[test]
+    fn test_zobrist_key_updates_on_quiet_moves() {
+        let mut pos = Position::default();
+        let original_key = pos.key();
+        assert_ne!(original_key.inner(), 0);
+
+        pos.make_move(Move::from_uci(&pos, "b1a3").unwrap());
+        assert_ne!(pos.key(), original_key);
+        pos.make_move(Move::from_uci(&pos, "b8a6").unwrap());
+        assert_ne!(pos.key(), original_key);
+        pos.make_move(Move::from_uci(&pos, "a3b1").unwrap());
+        assert_ne!(pos.key(), original_key);
+        pos.make_move(Move::from_uci(&pos, "a6b8").unwrap());
+        assert_eq!(pos.key(), original_key);
+    }
+
+    // There are four cases in which castling rights can be lost:
+    //  1. The King was moved
+    //  2. A Rook was moved
+    //  3. A Rook was captured
+    //  4. Castling was performed
+    //
+    // I am also littering in some assertions on the Zobrist keys, just to be safe.
+
+    #[test]
+    fn test_castling_rights_update_on_king_move() {
+        /***********************************/
+        /* Test case 1: The King was moved */
+        /***********************************/
+        let fen = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
+        let mut pos = Position::from_fen(fen).unwrap();
+        let original_key = pos.key();
+        let original_rights = pos.castling_rights().clone();
+
+        // Moving the White King should remove White's castling rights
+        pos.make_move(Move::from_uci(&pos, "e1d1").unwrap());
+        assert_ne!(pos.key(), original_key);
+        assert_ne!(pos.castling_rights(), &original_rights);
+        assert_eq!(pos.castling_rights_uci(), "kq");
+
+        // Same for Black
+        pos.make_move(Move::from_uci(&pos, "e8f8").unwrap());
+        assert_ne!(pos.key(), original_key);
+        assert_ne!(pos.castling_rights(), &original_rights);
+        assert_eq!(pos.castling_rights_uci(), "-");
+
+        // Moving the White King back should NOT restore castling rights
+        pos.make_move(Move::from_uci(&pos, "d1e1").unwrap());
+        assert_ne!(pos.key(), original_key);
+        assert_ne!(pos.castling_rights(), &original_rights);
+        assert_eq!(pos.castling_rights_uci(), "-");
+
+        // Same for Black
+        pos.make_move(Move::from_uci(&pos, "f8e8").unwrap());
+        assert_ne!(pos.key(), original_key);
+        assert_ne!(pos.castling_rights(), &original_rights);
+        assert_eq!(pos.castling_rights_uci(), "-");
+    }
+
+    #[test]
+    fn test_castling_rights_update_on_rook_move() {
+        /*********************************/
+        /* Test case 2: A Rook was moved */
+        /*********************************/
+        let fen = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
+        let mut pos = Position::from_fen(fen).unwrap();
+        let original_key = pos.key();
+        let original_rights = pos.castling_rights().clone();
+
+        // Moving a Rook should disable castling for that side
+        pos.make_move(Move::from_uci(&pos, "a1b1").unwrap());
+        assert_ne!(pos.key(), original_key);
+        assert_ne!(pos.castling_rights(), &original_rights);
+        assert_eq!(pos.castling_rights_uci(), "Kkq");
+
+        // Same for Black
+        pos.make_move(Move::from_uci(&pos, "a8b8").unwrap());
+        assert_ne!(pos.key(), original_key);
+        assert_ne!(pos.castling_rights(), &original_rights);
+        assert_eq!(pos.castling_rights_uci(), "Kk");
+
+        // Moving the Rook back should NOT re-enable castling for that side
+        pos.make_move(Move::from_uci(&pos, "b1a1").unwrap());
+        assert_ne!(pos.key(), original_key);
+        assert_ne!(pos.castling_rights(), &original_rights);
+        assert_eq!(pos.castling_rights_uci(), "Kk");
+
+        // Same for Black
+        pos.make_move(Move::from_uci(&pos, "b8a8").unwrap());
+        assert_ne!(pos.key(), original_key);
+        assert_ne!(pos.castling_rights(), &original_rights);
+        assert_eq!(pos.castling_rights_uci(), "Kk");
+    }
+
+    #[test]
+    fn test_castling_rights_update_on_rook_captured() {
+        /************************************/
+        /* Test case 3: A Rook was captured */
+        /************************************/
+        let fen = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
+        let mut pos = Position::from_fen(fen).unwrap();
+        let original_key = pos.key();
+        let original_rights = pos.castling_rights().clone();
+
+        // Capturing a Rook should disable castling on that side for the side that lost the Rook
+        pos.make_move(Move::from_uci(&pos, "a1a8").unwrap());
+        assert_ne!(pos.key(), original_key);
+        assert_ne!(pos.castling_rights(), &original_rights);
+        assert_eq!(pos.castling_rights_uci(), "Kk"); // White used it's H1 Rook to capture, so they lose their rights on that side as well
+
+        // Same for Black, on the other side
+        pos.make_move(Move::from_uci(&pos, "h8h1").unwrap());
+        assert_ne!(pos.key(), original_key);
+        assert_ne!(pos.castling_rights(), &original_rights);
+        assert_eq!(pos.castling_rights_uci(), "-");
+    }
+
+    #[test]
+    fn test_castling_rights_update_on_castling_performed() {
+        /***************************************/
+        /* Test case 3: Castling was performed */
+        /***************************************/
+        let fen = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
+        let mut pos = Position::from_fen(fen).unwrap();
+        let original_key = pos.key();
+        let original_rights = pos.castling_rights().clone();
+
+        // Performing castling should remove that side's rights altogether
+        pos.make_move(Move::from_uci(&pos, "e1g1").unwrap());
+        assert_ne!(pos.key(), original_key);
+        assert_ne!(pos.castling_rights(), &original_rights);
+        assert_eq!(pos.castling_rights_uci(), "kq");
+
+        // Same for Black, on the other side
+        pos.make_move(Move::from_uci(&pos, "e8c8").unwrap());
+        assert_ne!(pos.key(), original_key);
+        assert_ne!(pos.castling_rights(), &original_rights);
+        assert_eq!(pos.castling_rights_uci(), "-");
+    }
+
+    #[test]
+    fn test_castling_rights_update_on_promote_to_rook() {
+        // Now for a more complicate scenario:
+        // Black will capture White's H1 Rook,
+        //  but White will promote a Pawn to a Rook,
+        //  then capture Black's Rook on H1.
+        //
+        // Queenside/Long castling rights for White should NOT be restored!
+
+        let fen = "4k2r/P7/8/8/r7/8/8/RB2K2R b KQk - 0 1";
+        let mut pos = Position::from_fen(fen).unwrap();
+        let original_key = pos.key();
+        let original_rights = pos.castling_rights().clone();
+        assert_eq!(pos.castling_rights_uci(), "KQk");
+
+        // Black captures White's H1 Rook
+        pos.make_move(Move::from_uci(&pos, "a4a1").unwrap());
+        assert_eq!(pos.castling_rights_uci(), "Kk");
+
+        // White promotes a Pawn to a Rook
+        pos.make_move(Move::from_uci(&pos, "a7a8r").unwrap());
+        assert_eq!(pos.castling_rights_uci(), "Kk");
+
+        // Black moves it's King out of Check
+        pos.make_move(Move::from_uci(&pos, "e8e7").unwrap());
+        assert_eq!(pos.castling_rights_uci(), "K");
+
+        // White captures Black's Rook on H1
+        pos.make_move(Move::from_uci(&pos, "a8a1").unwrap());
+        assert_eq!(pos.castling_rights_uci(), "K");
+
+        // Despite having a Rook back on H1, White should NOT be able to queenside/long castle
+        assert_ne!(pos.key(), original_key);
+        assert_ne!(pos.castling_rights(), &original_rights);
+    }
+}

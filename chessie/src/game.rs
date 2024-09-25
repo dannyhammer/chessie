@@ -85,7 +85,7 @@ impl Game {
         Ok(Self::new(Position::from_fen(fen)?))
     }
 
-    /// Clones `self` and returns a [`Game`] after having applied the provided [`Move`].
+    /// Copies `self` and returns a [`Game`] after having applied the provided [`Move`].
     #[inline(always)]
     pub fn with_move_made(&self, mv: Move) -> Self {
         let mut copied = *self;
@@ -125,7 +125,7 @@ impl Game {
 
     /// Applies the move, if it is legal to make. If it is not legal, returns an `Err` explaining why.
     pub fn make_move_checked(&mut self, mv: Move) -> Result<()> {
-        self.check_legality_of(mv)?;
+        self.check_pseudo_legality_of(mv)?;
         self.make_move(mv);
         Ok(())
     }
@@ -619,17 +619,17 @@ impl Game {
             Bitboard::default()
         } else {
             // Otherwise, compute castling availability like normal
-            let short = self.castling_rights_for(color).short.map(|rook_sq| {
+            let short = self.castling_rights_for(color).short.map(|rook| {
                 self.generate_castling_bitboard(
-                    rook_sq,
+                    Square::new(rook, Rank::first(color)),
                     Square::G1.rank_relative_to(color),
                     enemy_attacks,
                 )
             });
 
-            let long = self.castling_rights_for(color).long.map(|rook_sq| {
+            let long = self.castling_rights_for(color).long.map(|rook| {
                 self.generate_castling_bitboard(
-                    rook_sq,
+                    Square::new(rook, Rank::first(color)),
                     Square::C1.rank_relative_to(color),
                     enemy_attacks,
                 )
