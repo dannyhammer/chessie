@@ -22,6 +22,7 @@ pub struct ZobristKey(u64);
 
 impl ZobristKey {
     /// Generates a new [`ZobristKey`] from the supplied [`Position`].
+    #[inline(always)]
     pub fn new(position: &Position) -> Self {
         Self::from_parts(
             position.board(),
@@ -35,7 +36,7 @@ impl ZobristKey {
     pub fn from_parts(
         board: &Board,
         ep_square: Option<Square>,
-        castling_rights: &CastlingRights,
+        castling_rights: &[CastlingRights; Color::COUNT],
         color: Color,
     ) -> Self {
         let mut key = Self::default();
@@ -58,6 +59,7 @@ impl ZobristKey {
     }
 
     /// Return the inner `u64` of this key.
+    #[inline(always)]
     pub fn inner(&self) -> u64 {
         self.0
     }
@@ -65,32 +67,41 @@ impl ZobristKey {
     /// Adds/removes `hash_key` to this [`ZobristKey`].
     ///
     /// This is done internally with the XOR operator.
+    #[inline(always)]
     pub fn hash(&mut self, hash_key: u64) {
         self.0 ^= hash_key;
     }
 
     /// Adds/removes the hash for the provided `piece`/`square` combo to this [`ZobristKey`].
+    #[inline(always)]
     pub fn hash_piece(&mut self, square: Square, piece: Piece) {
         self.hash(ZOBRIST_TABLE.piece_keys[square][piece]);
     }
 
     /// Adds/removes the hash for the provided `ep_square` to this [`ZobristKey`].
+    #[inline(always)]
     pub fn hash_ep_square(&mut self, ep_square: Square) {
         self.hash(ZOBRIST_TABLE.ep_keys[ep_square]);
     }
 
     /// Adds/removes the hash for the provided `ep_square` to this [`ZobristKey`].
+    #[inline(always)]
     pub fn hash_optional_ep_square(&mut self, ep_square: Option<Square>) {
         // This works because all squares where EP isn't possible (including Square::default) have a hash value of 0
         self.hash_ep_square(ep_square.unwrap_or_default());
     }
 
     /// Adds/removes the hash for the provided `castling_rights` to this [`ZobristKey`].
-    pub fn hash_castling_rights(&mut self, castling_rights: &CastlingRights) {
-        self.hash(ZOBRIST_TABLE.castling_keys[castling_rights]);
+    #[inline(always)]
+    pub fn hash_castling_rights(&mut self, castling_rights: &[CastlingRights; Color::COUNT]) {
+        let w_index = castling_rights[Color::White].index();
+        let b_index = castling_rights[Color::Black].index();
+        let index = w_index << 2 | b_index;
+        self.hash(ZOBRIST_TABLE.castling_keys[index]);
     }
 
     /// Adds/removes the hash for when the side-to-move is Black to this [`ZobristKey`].
+    #[inline(always)]
     pub fn hash_side_to_move(&mut self, color: Color) {
         self.hash(ZOBRIST_TABLE.color_key[color]);
     }

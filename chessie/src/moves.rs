@@ -66,6 +66,7 @@ impl MoveKind {
     ///
     /// # Panics
     /// This function will panic if `promotion` is not a Knight, Bishop, Rook, or Queen.
+    #[inline(always)]
     pub fn promotion(promotion: PieceKind) -> Self {
         match promotion {
             PieceKind::Knight => Self::PromoteKnight,
@@ -80,6 +81,7 @@ impl MoveKind {
     ///
     /// # Panics
     /// This function will panic if `promotion` is not a Knight, Bishop, Rook, or Queen.
+    #[inline(always)]
     pub fn promotion_capture(promotion: PieceKind) -> Self {
         match promotion {
             PieceKind::Knight => Self::CaptureAndPromoteKnight,
@@ -150,6 +152,7 @@ impl MoveKind {
     }
 
     /// Fetches the [`PieceKind`] to promote to, if `self` is a promotion.
+    #[inline(always)]
     pub fn get_promotion(&self) -> Option<PieceKind> {
         match self {
             Self::PromoteQueen | Self::CaptureAndPromoteQueen => Some(PieceKind::Queen),
@@ -215,6 +218,7 @@ impl Move {
     /// let e7e8n = Move::new(Square::E7, Square::E8, MoveKind::promotion(PieceKind::Knight));
     /// assert_eq!(e7e8n.to_string(), "e7e8n");
     /// ```
+    #[inline(always)]
     pub fn new(from: Square, to: Square, kind: MoveKind) -> Self {
         Self(kind as u16 | (to.inner() as u16) << Self::DST_BITS | from.inner() as u16)
     }
@@ -227,6 +231,7 @@ impl Move {
     /// let e2e3 = Move::new_quiet(Square::E2, Square::E3);
     /// assert_eq!(e2e3.to_string(), "e2e3");
     /// ```
+    #[inline(always)]
     pub fn new_quiet(from: Square, to: Square) -> Self {
         Self::new(from, to, MoveKind::Quiet)
     }
@@ -239,6 +244,7 @@ impl Move {
     /// let illegal = Move::illegal();
     /// assert_eq!(illegal.to_string(), "a1a1");
     /// ```
+    #[inline(always)]
     pub const fn illegal() -> Self {
         Self(0)
     }
@@ -252,6 +258,7 @@ impl Move {
     /// let from = e2e4.from();
     /// assert_eq!(from, Square::E2);
     /// ```
+    #[inline(always)]
     pub const fn from(&self) -> Square {
         Square::from_bits_unchecked((self.0 & Self::SRC_MASK) as u8)
     }
@@ -265,6 +272,7 @@ impl Move {
     /// let to = e2e4.to();
     /// assert_eq!(to, Square::E4);
     /// ```
+    #[inline(always)]
     pub const fn to(&self) -> Square {
         Square::from_bits_unchecked(((self.0 & Self::DST_MASK) >> Self::DST_BITS) as u8)
     }
@@ -277,6 +285,7 @@ impl Move {
     /// let e7e8q = Move::new(Square::E7, Square::E8, MoveKind::promotion(PieceKind::Queen));
     /// assert_eq!(e7e8q.kind(), MoveKind::promotion(PieceKind::Queen));
     /// ```
+    #[inline(always)]
     pub fn kind(&self) -> MoveKind {
         // Safety: Since a `Move` can ONLY be constructed through the public API,
         // any instance of a `Move` is guaranteed to have a valid bit pattern for its `MoveKind`.
@@ -294,6 +303,7 @@ impl Move {
     /// assert_eq!(to, Square::E8);
     /// assert_eq!(kind, MoveKind::promotion(PieceKind::Queen));
     /// ```
+    #[inline(always)]
     pub fn parts(&self) -> (Square, Square, MoveKind) {
         (self.from(), self.to(), self.kind())
     }
@@ -307,26 +317,31 @@ impl Move {
     /// let e5f7 = Move::from_uci(&position, "e5f7").unwrap();
     /// assert_eq!(e5f7.is_capture(), true);
     /// ```
+    #[inline(always)]
     pub const fn is_capture(&self) -> bool {
         self.0 & Self::FLAG_CAPTURE != 0
     }
 
     /// Returns `true` if this [`Move`] is en passant.
+    #[inline(always)]
     pub const fn is_en_passant(&self) -> bool {
         (self.0 & Self::FLG_MASK) ^ Self::FLAG_EP_CAPTURE == 0
     }
 
     /// Returns `true` if this [`Move`] is a short (kingside) castle.
+    #[inline(always)]
     pub const fn is_short_castle(&self) -> bool {
         (self.0 & Self::FLG_MASK) ^ Self::FLAG_CASTLE_SHORT == 0
     }
 
     /// Returns `true` if this [`Move`] is a long (queenside) castle.
+    #[inline(always)]
     pub const fn is_long_castle(&self) -> bool {
         (self.0 & Self::FLG_MASK) ^ Self::FLAG_CASTLE_LONG == 0
     }
 
     /// Returns `true` if this [`Move`] is a short (kingside) or long (queenside) castle.
+    #[inline(always)]
     pub const fn is_castle(&self) -> bool {
         self.is_short_castle() || self.is_long_castle()
     }
@@ -339,6 +354,7 @@ impl Move {
     /// let e2e4 = Move::new(Square::E2, Square::E4, MoveKind::PawnDoublePush);
     /// assert_eq!(e2e4.is_pawn_double_push(), true);
     /// ```
+    #[inline(always)]
     pub const fn is_pawn_double_push(&self) -> bool {
         (self.0 & Self::FLG_MASK) ^ Self::FLAG_PAWN_DOUBLE == 0
     }
@@ -354,6 +370,7 @@ impl Move {
     /// let e7e8q = Move::new(Square::E7, Square::E8, MoveKind::promotion_capture(PieceKind::Queen));
     /// assert_eq!(e7e8q.is_promotion(), true);
     /// ```
+    #[inline(always)]
     pub const fn is_promotion(&self) -> bool {
         // The flag bit for "promotion" is the most-significant bit.
         // Internally, FLAG_PROMO_KNIGHT has flag bits `1000`, so we can use it as a mask for promotions.
@@ -370,6 +387,7 @@ impl Move {
     /// let b7c8b = Move::from_uci(&position, "b7c8b").unwrap();
     /// assert_eq!(b7c8b.promotion(), Some(PieceKind::Bishop));
     /// ```
+    #[inline(always)]
     pub fn promotion(&self) -> Option<PieceKind> {
         match self.0 & Self::FLG_MASK {
             Self::FLAG_PROMO_QUEEN | Self::FLAG_CAPTURE_PROMO_QUEEN => Some(PieceKind::Queen),

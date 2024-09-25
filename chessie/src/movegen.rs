@@ -157,6 +157,7 @@ impl<'a> MoveGenIter<'a> {
     }
 
     /// Consumes `self`, returning a [`MoveGenIter`] that only generates moves _to_ the squares in `mask`.
+    #[inline(always)]
     pub fn only_moves_to(mut self, mask: impl Into<Bitboard>) -> Self {
         self.to_mask = mask.into();
         self
@@ -165,6 +166,7 @@ impl<'a> MoveGenIter<'a> {
     /// Consumes `self`, returning a [`MoveGenIter`] that only generates moves that capture enemy pieces.
     ///
     /// **Note**: This does not include en passant, for simplicity
+    #[inline(always)]
     pub fn only_captures(self) -> Self {
         let opponent = self.game.side_to_move().opponent();
         let mask = self.game.color(opponent);
@@ -229,8 +231,13 @@ impl<'a> MoveGenIter<'a> {
             let piece = self.game.piece_at_unchecked(self.square); // Square is guaranteed to have piece on it.
 
             // Mask off anything not in the "to" mask
-            self.mobility =
-                self.game.generate_legal_mobility_for(piece, self.square) & self.to_mask;
+            self.mobility = if self.game.is_in_check() {
+                self.game
+                    .generate_legal_mobility_for::<true>(piece, self.square)
+            } else {
+                self.game
+                    .generate_legal_mobility_for::<false>(piece, self.square)
+            } & self.to_mask;
         }
 
         // Create a `Move` struct from the move data.
@@ -248,6 +255,7 @@ impl<'a> MoveGenIter<'a> {
 
 impl<'a> Iterator for MoveGenIter<'a> {
     type Item = Move;
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         self.get_next_move()
     }
@@ -255,20 +263,13 @@ impl<'a> Iterator for MoveGenIter<'a> {
 
 /// Computes a [`Bitboard`] of all the pieces that attack the provided [`Square`].
 pub fn compute_attacks_to(board: &Board, square: Square, attacker_color: Color) -> Bitboard {
-    let pawns = board.pawns(attacker_color);
-    let knights = board.knights(attacker_color);
-    let bishops = board.diagonal_sliders(attacker_color);
-    let rooks = board.orthogonal_sliders(attacker_color);
-    let king = board.king(attacker_color);
-
     let occupied = board.occupied();
-    let mut attacks = pawn_attacks(square, attacker_color.opponent()) & pawns;
-    attacks |= knight_attacks(square) & knights;
-    attacks |= bishop_attacks(square, occupied) & bishops;
-    attacks |= rook_attacks(square, occupied) & rooks;
-    attacks |= king_attacks(square) & king;
 
-    attacks
+    (pawn_attacks(square, attacker_color.opponent()) & board.pawns(attacker_color))
+        | (knight_attacks(square) & board.knights(attacker_color))
+        | (bishop_attacks(square, occupied) & board.diagonal_sliders(attacker_color))
+        | (rook_attacks(square, occupied) & board.orthogonal_sliders(attacker_color))
+        | (king_attacks(square) & board.king(attacker_color))
 }
 
 pub fn compute_pinmask_for(board: &Board, square: Square, color: Color) -> Bitboard {
@@ -316,6 +317,7 @@ pub fn compute_pinmask_for(board: &Board, square: Square, color: Color) -> Bitbo
 /// If Pawn pushes were included in this "attack map", then the King would not be able to
 /// move to squares otherwise be safe, as the move generator would think that a Pawn's
 /// threat of pushing could check the King.
+#[inline(always)]
 pub const fn attacks_for(piece: Piece, square: Square, blockers: Bitboard) -> Bitboard {
     match piece.kind() {
         PieceKind::Pawn => pawn_attacks(square, piece.color()),
@@ -334,6 +336,7 @@ pub const fn attacks_for(piece: Piece, square: Square, blockers: Bitboard) -> Bi
 /// # use chessie::*;
 /// assert_eq!(ray_between(Square::A1, Square::A8), Bitboard::FILE_A ^ Square::A1 ^ Square::A8);
 /// ```
+#[inline(always)]
 pub const fn ray_between(from: Square, to: Square) -> Bitboard {
     RAY_BETWEEN[from.index()][to.index()]
 }
@@ -345,6 +348,7 @@ pub const fn ray_between(from: Square, to: Square) -> Bitboard {
 /// # use chessie::*;
 /// assert_eq!(ray_containing(Square::A3, Square::A5), Bitboard::FILE_A);
 /// ```
+#[inline(always)]
 pub const fn ray_containing(from: Square, to: Square) -> Bitboard {
     RAY_CONTAINING[from.index()][to.index()]
 }
@@ -352,6 +356,7 @@ pub const fn ray_containing(from: Square, to: Square) -> Bitboard {
 /// Computes the possible moves for a Rook at a given [`Square`] with the provided blockers.
 ///
 /// This will yield a [`Bitboard`] that allows the Rook to capture the first blocker.
+#[inline(always)]
 pub const fn rook_attacks(square: Square, blockers: Bitboard) -> Bitboard {
     let magic = &ROOK_MAGICS[square.index()];
     Bitboard::new(ROOK_MOVES[magic_index(magic, blockers)])
@@ -360,6 +365,7 @@ pub const fn rook_attacks(square: Square, blockers: Bitboard) -> Bitboard {
 /// Computes the possible moves for a Bishop at a given [`Square`] with the provided blockers.
 ///
 /// This will yield a [`Bitboard`] that allows the Bishop to capture the first blocker.
+#[inline(always)]
 pub const fn bishop_attacks(square: Square, blockers: Bitboard) -> Bitboard {
     let magic = &BISHOP_MAGICS[square.index()];
     Bitboard::new(BISHOP_MOVES[magic_index(magic, blockers)])
@@ -368,16 +374,19 @@ pub const fn bishop_attacks(square: Square, blockers: Bitboard) -> Bitboard {
 /// Computes the possible moves for a Queen at a given [`Square`] with the provided blockers.
 ///
 /// This will yield a [`Bitboard`] that allows the Queen to capture the first blocker.
+#[inline(always)]
 pub const fn queen_attacks(square: Square, blockers: Bitboard) -> Bitboard {
     rook_attacks(square, blockers).or(bishop_attacks(square, blockers))
 }
 
 /// Fetch the raw, unblocked attacks for a knight on the provided square.
+#[inline(always)]
 pub const fn knight_attacks(square: Square) -> Bitboard {
     KNIGHT_ATTACKS[square.index()]
 }
 
 /// Fetch the raw, unblocked attacks for a king on the provided square.
+#[inline(always)]
 pub const fn king_attacks(square: Square) -> Bitboard {
     KING_ATTACKS[square.index()]
 }
@@ -406,12 +415,8 @@ pub const fn pawn_moves(square: Square, color: Color, blockers: Bitboard) -> Bit
 // const PAWN_PUSHES: [&'static [Bitboard; 64]; 2] = [&WHITE_PAWN_PUSHES, &BLACK_PAWN_PUSHES];
 
 /// Fetch the raw, unblocked pushes for a pawn of the provided color on the provided square.
+#[inline(always)]
 pub const fn pawn_pushes(square: Square, color: Color) -> Bitboard {
-    // [
-    //     WHITE_PAWN_PUSHES[square.index()],
-    //     BLACK_PAWN_PUSHES[square.index()],
-    // ][color.index()]
-
     match color {
         Color::White => WHITE_PAWN_PUSHES[square.index()],
         Color::Black => BLACK_PAWN_PUSHES[square.index()],
@@ -419,6 +424,7 @@ pub const fn pawn_pushes(square: Square, color: Color) -> Bitboard {
 }
 
 /// Fetch the raw, unblocked attacks for a pawn of the provided color on the provided square.
+#[inline(always)]
 pub const fn pawn_attacks(square: Square, color: Color) -> Bitboard {
     match color {
         Color::White => WHITE_PAWN_ATTACKS[square.index()],
@@ -433,6 +439,7 @@ struct MagicEntry {
     offset: u32,
 }
 
+#[inline(always)]
 const fn magic_index(entry: &MagicEntry, blockers: Bitboard) -> usize {
     let blockers = blockers.inner() & entry.mask;
     let hash = blockers.wrapping_mul(entry.magic);

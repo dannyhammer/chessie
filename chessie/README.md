@@ -18,7 +18,7 @@ Only generate moves from specific squares (Knights, in this case):
 use chessie::{Game, Color};
 let game = Game::default(); // Default starting position
 let mask = game.knights(Color::White);
-for mv in game.iter().only_moves_from(mask) {
+for mv in game.into_iter().only_moves_from(mask) {
     print!("{mv} ");
 }
 // b1a3 b1c3 g1f3 g1h3
@@ -29,7 +29,7 @@ Only generate moves that capture enemy pieces:
 ```rust
 use chessie::Game;
 let game = Game::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1").unwrap();
-for mv in game.iter().only_captures() {
+for mv in game.into_iter().only_captures() {
     print!("{mv} ");
 }
 // e2a6 g2h3 f3h3 f3f6 d5e6 e5g6 e5d7 e5f7

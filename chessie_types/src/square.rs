@@ -133,6 +133,7 @@ impl Square {
     /// assert_eq!(iter.next().unwrap(), Square::A1);
     /// assert_eq!(iter.last().unwrap(), Square::H8);
     /// ```
+    #[inline(always)]
     pub fn iter() -> impl ExactSizeIterator<Item = Self> + DoubleEndedIterator<Item = Self> {
         (Self::MIN..=Self::MAX).map(Self)
     }
@@ -145,6 +146,7 @@ impl Square {
     /// let c4 = Square::new(File::C, Rank::FOUR);
     /// assert_eq!(c4, Square::C4);
     /// ```
+    #[inline(always)]
     pub const fn new(file: File, rank: Rank) -> Self {
         // least-significant file mapping
         Self(file.0 ^ rank.0 << 3)
@@ -161,6 +163,7 @@ impl Square {
     /// assert!(c4.is_ok());
     /// assert_eq!(c4.unwrap(), Square::C4);
     /// ```
+    #[inline(always)]
     pub fn from_index(index: usize) -> Result<Self> {
         Self::from_bits(index as u8)
     }
@@ -177,6 +180,7 @@ impl Square {
     /// let c4 = Square::from_index_unchecked(26);
     /// assert_eq!(c4, Square::C4);
     /// ```
+    #[inline(always)]
     pub const fn from_index_unchecked(index: usize) -> Self {
         debug_assert!(index < 64, "Index must be between [0,64)");
         Self(index as u8)
@@ -193,6 +197,7 @@ impl Square {
     /// assert!(c4.is_ok());
     /// assert_eq!(c4.unwrap(), Square::C4);
     /// ```
+    #[inline(always)]
     pub fn from_bits(bits: u8) -> Result<Self> {
         if bits > Self::MAX {
             bail!(
@@ -214,6 +219,7 @@ impl Square {
     /// let c4 = Square::from_bits_unchecked(26);
     /// assert_eq!(c4, Square::C4);
     /// ```
+    #[inline(always)]
     pub const fn from_bits_unchecked(bits: u8) -> Self {
         Self(bits)
     }
@@ -229,6 +235,7 @@ impl Square {
     /// assert_eq!(Square::A1.flipped(), Square::H8);
     /// assert_eq!(Square::C4.flipped(), Square::F5);
     /// ```
+    #[inline(always)]
     pub const fn flipped(self) -> Self {
         Self(Self::MAX - self.0)
     }
@@ -241,6 +248,7 @@ impl Square {
     /// assert_eq!(Square::A1.flipped_file(), Square::H1);
     /// assert_eq!(Square::C4.flipped_file(), Square::F4);
     /// ```
+    #[inline(always)]
     pub const fn flipped_file(self) -> Self {
         Self(self.0 ^ Self::FILE_MASK)
     }
@@ -253,6 +261,7 @@ impl Square {
     /// assert_eq!(Square::A1.flipped_rank(), Square::A8);
     /// assert_eq!(Square::C4.flipped_rank(), Square::C5);
     /// ```
+    #[inline(always)]
     pub const fn flipped_rank(self) -> Self {
         Self(self.0 ^ Self::RANK_MASK)
     }
@@ -268,6 +277,7 @@ impl Square {
     /// assert_eq!(Square::C4.relative_to(Color::White), Square::C4);
     /// assert_eq!(Square::C4.relative_to(Color::Black), Square::F5);
     /// ```
+    #[inline(always)]
     pub const fn relative_to(self, color: Color) -> Self {
         match color {
             Color::White => self,
@@ -286,6 +296,7 @@ impl Square {
     /// assert_eq!(Square::E1.rank_relative_to(Color::White), Square::E1);
     /// assert_eq!(Square::E1.rank_relative_to(Color::Black), Square::E8);
     /// ```
+    #[inline(always)]
     pub const fn rank_relative_to(self, color: Color) -> Self {
         match color {
             Color::White => self,
@@ -304,6 +315,7 @@ impl Square {
     /// assert_eq!(Square::A1.file_relative_to(Color::White), Square::A1);
     /// assert_eq!(Square::A1.file_relative_to(Color::Black), Square::H1);
     /// ```
+    #[inline(always)]
     pub const fn file_relative_to(self, color: Color) -> Self {
         match color {
             Color::White => self,
@@ -320,6 +332,7 @@ impl Square {
     /// assert_eq!(Square::H3.next(), Some(Square::A4));
     /// assert_eq!(Square::H8.next(), None);
     /// ```
+    #[inline(always)]
     pub fn next(self) -> Option<Self> {
         (self.0 < Self::MAX).then(|| Self::from_bits_unchecked(self.0 + 1))
     }
@@ -333,6 +346,7 @@ impl Square {
     /// assert_eq!(Square::A4.prev(), Some(Square::H3));
     /// assert_eq!(Square::H8.prev(), Some(Square::G8));
     /// ```
+    #[inline(always)]
     pub fn prev(self) -> Option<Self> {
         (self.0 > Self::MIN).then(|| Self::from_bits_unchecked(self.0 - 1))
     }
@@ -344,6 +358,7 @@ impl Square {
     /// # use chessie_types::Square;
     /// assert_eq!(Square::C4.inner(), 26);
     /// ```
+    #[inline(always)]
     pub const fn inner(&self) -> u8 {
         self.0
     }
@@ -355,6 +370,7 @@ impl Square {
     /// # use chessie_types::{Square, File};
     /// assert_eq!(Square::C4.file(), File::C);
     /// ```
+    #[inline(always)]
     pub const fn file(&self) -> File {
         File(self.0 & Self::FILE_MASK) // Same as % 8
     }
@@ -366,6 +382,7 @@ impl Square {
     /// # use chessie_types::{Square, Rank};
     /// assert_eq!(Square::C4.rank(), Rank::FOUR);
     /// ```
+    #[inline(always)]
     pub const fn rank(&self) -> Rank {
         Rank(self.0 >> 3) // Same as / 8
     }
@@ -377,6 +394,7 @@ impl Square {
     /// # use chessie_types::{Square, File, Rank};
     /// assert_eq!(Square::C4.parts(), (File::C, Rank::FOUR));
     /// ```
+    #[inline(always)]
     pub const fn parts(&self) -> (File, Rank) {
         (self.file(), self.rank())
     }
@@ -390,6 +408,7 @@ impl Square {
     /// # use chessie_types::Square;
     /// assert_eq!(Square::C4.index(), 26);
     /// ```
+    #[inline(always)]
     pub const fn index(&self) -> usize {
         self.inner() as usize
     }
@@ -405,6 +424,7 @@ impl Square {
     /// assert_eq!(Square::C4.color(), Color::White);
     /// assert_eq!(Square::C5.color(), Color::Black);
     /// ```
+    #[inline(always)]
     pub const fn color(&self) -> Color {
         Color::from_bool(self.is_dark())
     }
@@ -416,6 +436,7 @@ impl Square {
     /// # use chessie_types::Square;
     /// assert!(Square::C4.is_light());
     /// ```
+    #[inline(always)]
     pub const fn is_light(&self) -> bool {
         (Bitboard::DARK_SQUARES.0 & self.0 as u64) != 0
     }
@@ -427,6 +448,7 @@ impl Square {
     /// # use chessie_types::Square;
     /// assert!(Square::C5.is_dark());
     /// ```
+    #[inline(always)]
     pub const fn is_dark(&self) -> bool {
         !self.is_light()
     }
@@ -440,6 +462,7 @@ impl Square {
     /// assert_eq!(Square::C5.distance_files(Square::B2), 1);
     /// assert_eq!(Square::A1.distance_files(Square::H1), 7);
     /// ```
+    #[inline(always)]
     pub const fn distance_files(&self, other: Self) -> u8 {
         self.file().0.abs_diff(other.file().0)
     }
@@ -453,6 +476,7 @@ impl Square {
     /// assert_eq!(Square::C5.distance_ranks(Square::C4), 1);
     /// assert_eq!(Square::A1.distance_ranks(Square::A8), 7);
     /// ```
+    #[inline(always)]
     pub const fn distance_ranks(&self, other: Self) -> u8 {
         self.rank().0.abs_diff(other.rank().0)
     }
@@ -467,6 +491,7 @@ impl Square {
     /// assert_eq!(Square::C5.distance_manhattan(Square::B4), 2);
     /// assert_eq!(Square::A1.distance_manhattan(Square::H8), 14);
     /// ```
+    #[inline(always)]
     pub const fn distance_manhattan(&self, other: Self) -> u8 {
         self.distance_files(other) + self.distance_ranks(other)
     }
@@ -481,6 +506,7 @@ impl Square {
     /// assert_eq!(Square::C5.distance_chebyshev(Square::B4), 1);
     /// assert_eq!(Square::A1.distance_chebyshev(Square::H8), 7);
     /// ```
+    #[inline(always)]
     pub const fn distance_chebyshev(&self, other: Self) -> u8 {
         let file_dist = self.distance_files(other);
         let rank_dist = self.distance_ranks(other);
@@ -503,6 +529,7 @@ impl Square {
     /// assert_eq!(Square::A4.is_diagonal_to(Square::H3), false);
     /// assert_eq!(Square::A4.is_diagonal_to(Square::H4), false);
     /// ```
+    #[inline(always)]
     pub const fn is_diagonal_to(&self, other: Self) -> bool {
         if self.0 == other.0 {
             return true;
@@ -525,6 +552,7 @@ impl Square {
     /// let err = Square::from_uci("z0");
     /// assert!(err.is_err());
     /// ```
+    #[inline(always)]
     pub fn from_uci(square: &str) -> Result<Self> {
         let bytes = square.as_bytes();
         if square.len() != 2 {
@@ -543,11 +571,13 @@ impl Square {
     /// # use chessie_types::Square;
     /// assert_eq!("c4", Square::C4.to_uci());
     /// ```
+    #[inline(always)]
     pub fn to_uci(self) -> String {
         format!("{}{}", self.file(), self.rank())
     }
 
     /// Alias for [`Bitboard::from_square`].
+    #[inline(always)]
     pub const fn bitboard(&self) -> Bitboard {
         Bitboard::from_square(*self)
     }
@@ -562,25 +592,9 @@ impl Square {
     /// assert_eq!(Square::D6.distance_to(Square::D6), 0);
     /// assert_eq!(Square::E2.distance_to(Square::C6), 6);
     /// ```
+    #[inline(always)]
     pub const fn distance_to(&self, other: Self) -> u8 {
         self.file().0.abs_diff(other.file().0) + self.rank().0.abs_diff(other.rank().0)
-    }
-
-    /// Computes the distance between `self` and the center of the board.
-    ///
-    /// The center squares are E4, E5, D4, and D5.
-    ///
-    /// # Example
-    /// ```
-    /// # use chessie_types::Square;
-    /// assert_eq!(Square::D5.distance_from_center(), 0);
-    /// assert_eq!(Square::E4.distance_from_center(), 0);
-    /// assert_eq!(Square::A1.distance_from_center(), 6);
-    /// ```
-    pub fn distance_from_center(&self) -> u8 {
-        self.distance_to(Self::E4)
-            .min(self.distance_to(Self::E5))
-            .min(self.distance_to(Self::D4).min(self.distance_to(Self::D5)))
     }
 
     /// Attempt to offset this [`Square`] by the file and rank offsets.
@@ -594,6 +608,7 @@ impl Square {
     /// assert_eq!(Square::C4.offset(-1, -1), Some(Square::B3));
     /// assert_eq!(Square::A1.offset(-1, -1), None);
     /// ```
+    #[inline(always)]
     pub fn offset(&self, file_delta: i8, rank_delta: i8) -> Option<Self> {
         let file = self.file().offset(file_delta)?;
         let rank = self.rank().offset(rank_delta)?;
@@ -611,6 +626,7 @@ impl Square {
     /// assert_eq!(Square::C4.forward_by(Color::White, 1), Some(Square::C5));
     /// assert_eq!(Square::C4.forward_by(Color::Black, 1), Some(Square::C3));
     /// ```
+    #[inline(always)]
     pub fn forward_by(&self, color: Color, n: u8) -> Option<Self> {
         self.offset(0, n as i8 * color.negation_multiplier())
     }
@@ -625,6 +641,7 @@ impl Square {
     /// assert_eq!(Square::C4.backward_by(Color::White, 1), Some(Square::C3));
     /// assert_eq!(Square::C4.backward_by(Color::Black, 1), Some(Square::C5));
     /// ```
+    #[inline(always)]
     pub fn backward_by(&self, color: Color, n: u8) -> Option<Self> {
         self.offset(0, n as i8 * color.opponent().negation_multiplier())
     }
@@ -639,6 +656,7 @@ impl Square {
     /// assert_eq!(Square::C4.right_by(Color::White, 1), Some(Square::D4));
     /// assert_eq!(Square::C4.right_by(Color::Black, 1), Some(Square::B4));
     /// ```
+    #[inline(always)]
     pub fn right_by(&self, color: Color, n: u8) -> Option<Self> {
         self.offset(n as i8 * color.negation_multiplier(), 0)
     }
@@ -653,20 +671,16 @@ impl Square {
     /// assert_eq!(Square::C4.left_by(Color::White, 1), Some(Square::B4));
     /// assert_eq!(Square::C4.left_by(Color::Black, 1), Some(Square::D4));
     /// ```
+    #[inline(always)]
     pub fn left_by(&self, color: Color, n: u8) -> Option<Self> {
         self.offset(n as i8 * color.opponent().negation_multiplier(), 0)
-    }
-}
-
-impl<T: AsRef<str>> PartialEq<T> for Square {
-    fn eq(&self, other: &T) -> bool {
-        self.to_string().eq(other.as_ref())
     }
 }
 
 impl FromStr for Square {
     type Err = anyhow::Error;
 
+    #[inline(always)]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::from_uci(s)
     }
@@ -674,6 +688,7 @@ impl FromStr for Square {
 
 impl TryFrom<&str> for Square {
     type Error = anyhow::Error;
+    #[inline(always)]
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Self::from_uci(value)
     }
@@ -681,6 +696,7 @@ impl TryFrom<&str> for Square {
 
 impl TryFrom<String> for Square {
     type Error = anyhow::Error;
+    #[inline(always)]
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::from_uci(&value)
     }
@@ -688,6 +704,7 @@ impl TryFrom<String> for Square {
 
 impl TryFrom<usize> for Square {
     type Error = anyhow::Error;
+    #[inline(always)]
     fn try_from(value: usize) -> Result<Self, Self::Error> {
         Self::from_index(value)
     }
@@ -695,6 +712,7 @@ impl TryFrom<usize> for Square {
 
 impl TryFrom<u8> for Square {
     type Error = anyhow::Error;
+    #[inline(always)]
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         Self::from_bits(value)
     }
@@ -702,6 +720,7 @@ impl TryFrom<u8> for Square {
 
 impl TryFrom<i32> for Square {
     type Error = anyhow::Error;
+    #[inline(always)]
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         Self::from_bits(value as u8)
     }
@@ -709,6 +728,7 @@ impl TryFrom<i32> for Square {
 
 impl Add<Rank> for Square {
     type Output = Self;
+    #[inline(always)]
     fn add(self, rhs: Rank) -> Self::Output {
         Self::new(self.file(), self.rank() + rhs)
     }
@@ -716,6 +736,7 @@ impl Add<Rank> for Square {
 
 impl Add<File> for Square {
     type Output = Self;
+    #[inline(always)]
     fn add(self, rhs: File) -> Self::Output {
         Self::new(self.file() + rhs, self.rank())
     }
@@ -723,6 +744,7 @@ impl Add<File> for Square {
 
 impl Sub<Rank> for Square {
     type Output = Self;
+    #[inline(always)]
     fn sub(self, rhs: Rank) -> Self::Output {
         Self::new(self.file(), self.rank() - rhs)
     }
@@ -730,30 +752,35 @@ impl Sub<Rank> for Square {
 
 impl Sub<File> for Square {
     type Output = Self;
+    #[inline(always)]
     fn sub(self, rhs: File) -> Self::Output {
         Self::new(self.file() - rhs, self.rank())
     }
 }
 
 impl AddAssign<Rank> for Square {
+    #[inline(always)]
     fn add_assign(&mut self, rhs: Rank) {
         *self = *self + rhs;
     }
 }
 
 impl SubAssign<Rank> for Square {
+    #[inline(always)]
     fn sub_assign(&mut self, rhs: Rank) {
         *self = *self - rhs;
     }
 }
 
 impl AddAssign<File> for Square {
+    #[inline(always)]
     fn add_assign(&mut self, rhs: File) {
         *self = *self + rhs;
     }
 }
 
 impl SubAssign<File> for Square {
+    #[inline(always)]
     fn sub_assign(&mut self, rhs: File) {
         *self = *self - rhs;
     }
@@ -761,12 +788,14 @@ impl SubAssign<File> for Square {
 
 impl<T> Index<Square> for [T; Square::COUNT] {
     type Output = T;
+    #[inline(always)]
     fn index(&self, index: Square) -> &Self::Output {
         &self[index.index()]
     }
 }
 
 impl<T> IndexMut<Square> for [T; Square::COUNT] {
+    #[inline(always)]
     fn index_mut(&mut self, index: Square) -> &mut Self::Output {
         &mut self[index.index()]
     }
@@ -774,12 +803,14 @@ impl<T> IndexMut<Square> for [T; Square::COUNT] {
 
 impl<T> Index<Square> for [[T; File::COUNT]; Rank::COUNT] {
     type Output = T;
+    #[inline(always)]
     fn index(&self, index: Square) -> &Self::Output {
         &self[index.file()][index.rank()]
     }
 }
 
 impl<T> IndexMut<Square> for [[T; File::COUNT]; Rank::COUNT] {
+    #[inline(always)]
     fn index_mut(&mut self, index: Square) -> &mut Self::Output {
         &mut self[index.file()][index.rank()]
     }
@@ -840,11 +871,13 @@ impl Rank {
     /// assert_eq!(iter.next().unwrap(), Rank::ONE);
     /// assert_eq!(iter.last().unwrap(), Rank::EIGHT);
     /// ```
+    #[inline(always)]
     pub fn iter() -> impl ExactSizeIterator<Item = Self> + DoubleEndedIterator<Item = Self> {
         Self::all().into_iter()
     }
 
     /// Construct a new [`Rank`] from the provided value.
+    #[inline(always)]
     pub fn new(rank: u8) -> Result<Self> {
         if rank > Self::MAX {
             bail!(
@@ -860,44 +893,54 @@ impl Rank {
     /// Construct a new [`Rank`] from the provided value, ignoring safety checks.
     ///
     /// Do not use this unless you have previously guaranteed that the input value is within bounds.
+    #[inline(always)]
     pub const fn new_unchecked(rank: u8) -> Self {
         Self(rank)
     }
 
     /// First rank relative to `color`.
+    #[inline(always)]
     pub const fn first(color: Color) -> Self {
         [Self::ONE, Self::EIGHT][color.index()]
     }
 
+    #[inline(always)]
     pub const fn second(color: Color) -> Self {
         [Self::TWO, Self::SEVEN][color.index()]
     }
 
+    #[inline(always)]
     pub const fn third(color: Color) -> Self {
         [Self::THREE, Self::SIX][color.index()]
     }
 
+    #[inline(always)]
     pub const fn fourth(color: Color) -> Self {
         [Self::FOUR, Self::FIVE][color.index()]
     }
 
+    #[inline(always)]
     pub const fn fifth(color: Color) -> Self {
         [Self::FIVE, Self::FOUR][color.index()]
     }
 
+    #[inline(always)]
     pub const fn sixth(color: Color) -> Self {
         [Self::SIX, Self::THREE][color.index()]
     }
 
+    #[inline(always)]
     /// Rank just before promoting a pawn
     pub const fn seventh(color: Color) -> Self {
         [Self::SEVEN, Self::TWO][color.index()]
     }
 
+    #[inline(always)]
     pub const fn eighth(color: Color) -> Self {
         [Self::EIGHT, Self::ONE][color.index()]
     }
 
+    #[inline(always)]
     pub fn from_char(rank: char) -> Result<Self> {
         debug_assert!(rank.is_ascii(), "Rank chars must be ASCII!");
 
@@ -912,6 +955,7 @@ impl Rank {
         Self::new(rank as u8)
     }
 
+    #[inline(always)]
     pub const fn inner(&self) -> u8 {
         self.0
     }
@@ -919,14 +963,17 @@ impl Rank {
     /// Obtain the inner value as a `usize`.
     ///
     /// Useful for indexing.
+    #[inline(always)]
     pub const fn index(&self) -> usize {
         self.inner() as usize
     }
 
+    #[inline(always)]
     pub const fn char(&self) -> char {
         (self.0 + b'1') as char
     }
 
+    #[inline(always)]
     pub const fn as_str(&self) -> &'static str {
         match self.0 {
             0 => "1",
@@ -942,11 +989,13 @@ impl Rank {
     }
 
     /// `const` analog of `==`.
+    #[inline(always)]
     pub const fn is(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 
     /// Alias for [`Bitboard::from_rank`].
+    #[inline(always)]
     pub const fn bitboard(&self) -> Bitboard {
         Bitboard::from_rank(*self)
     }
@@ -962,18 +1011,21 @@ impl Rank {
     /// assert_eq!(Rank::FOUR.offset(-1), Some(Rank::THREE));
     /// assert_eq!(Rank::ONE.offset(-1), None);
     /// ```
+    #[inline(always)]
     pub fn offset(self, delta: i8) -> Option<Self> {
         let bits = self.0.checked_add_signed(delta)?;
         (bits <= Self::MAX).then_some(Self::new_unchecked(bits))
     }
 
     /// Flips this [`Rank`].
+    #[inline(always)]
     pub const fn flipped(self) -> Self {
         Self(Self::MAX - self.0)
     }
 
     /// If `color` is White, does nothing.
     /// If `color` is Black, flips `self`.
+    #[inline(always)]
     pub const fn relative_to(self, color: Color) -> Self {
         match color {
             Color::White => self,
@@ -988,6 +1040,7 @@ impl Rank {
     /// # use chessie_types::Rank;
     /// assert_eq!(Rank::SEVEN.abs_diff(Rank::FIVE), 2);
     /// ```
+    #[inline(always)]
     pub const fn abs_diff(&self, other: Self) -> u8 {
         self.0.abs_diff(other.0)
     }
@@ -1009,6 +1062,7 @@ macro_rules! impl_try_from_num {
     ($t: ty, $from:ty) => {
         impl TryFrom<$from> for $t {
             type Error = anyhow::Error;
+            #[inline(always)]
             fn try_from(value: $from) -> Result<Self, Self::Error> {
                 Self::new(value as u8)
             }
@@ -1050,6 +1104,7 @@ macro_rules! impl_binary_ops_with_num {
     ($t:ty, $op:tt, $op_assign:tt, $func:ident, $func_assign:ident, $op_tok:tt) => {
         impl std::ops::$op for $t {
             type Output = Self;
+    #[inline(always)]
             fn $func(self, rhs: Self) -> Self::Output {
                 Self::new(self.0 $op_tok rhs.0)
                     .expect("Attempted to add {self} and {rhs}, which is beyond Rank's bounds")
@@ -1057,6 +1112,7 @@ macro_rules! impl_binary_ops_with_num {
         }
 
         impl std::ops::$op_assign for $t {
+    #[inline(always)]
             fn $func_assign(&mut self, rhs: Self) {
                 *self = *self $op_tok rhs;
             }
@@ -1067,6 +1123,7 @@ macro_rules! impl_binary_ops_with_num {
     ($t:ty, $rhs:ty, $op:tt, $op_assign:tt, $func:ident, $func_assign:ident, $op_tok:tt) => {
         impl std::ops::$op<$rhs> for $t {
             type Output = Self;
+    #[inline(always)]
             fn $func(self, rhs: $rhs) -> Self::Output {
                 Self::new(self.0 $op_tok rhs as u8)
                     .expect("Attempted to add {self} and {rhs}, which is beyond Rank's bounds")
@@ -1074,6 +1131,7 @@ macro_rules! impl_binary_ops_with_num {
         }
 
         impl std::ops::$op_assign<$rhs> for $t {
+    #[inline(always)]
             fn $func_assign(&mut self, rhs: $rhs) {
                 *self = *self $op_tok rhs;
             }
@@ -1085,12 +1143,14 @@ impl_binary_ops_with_num!(Rank);
 impl_try_from_num!(Rank);
 
 impl PartialEq<char> for Rank {
+    #[inline(always)]
     fn eq(&self, other: &char) -> bool {
         self.char().eq(other)
     }
 }
 
 impl PartialEq<str> for Rank {
+    #[inline(always)]
     fn eq(&self, other: &str) -> bool {
         self.as_str().eq(other)
     }
@@ -1098,12 +1158,14 @@ impl PartialEq<str> for Rank {
 
 impl TryFrom<char> for Rank {
     type Error = anyhow::Error;
+    #[inline(always)]
     fn try_from(value: char) -> Result<Self, Self::Error> {
         Self::from_char(value)
     }
 }
 
 impl From<Square> for Rank {
+    #[inline(always)]
     fn from(value: Square) -> Self {
         value.rank()
     }
@@ -1111,6 +1173,7 @@ impl From<Square> for Rank {
 
 impl Add<char> for Rank {
     type Output = Self;
+    #[inline(always)]
     fn add(self, rhs: char) -> Self::Output {
         self + Self::from_char(rhs).expect("Attempted to add {self} with invalid rank char")
     }
@@ -1118,18 +1181,21 @@ impl Add<char> for Rank {
 
 impl Sub<char> for Rank {
     type Output = Self;
+    #[inline(always)]
     fn sub(self, rhs: char) -> Self::Output {
         self - Self::from_char(rhs).expect("Attempted to sub {self} with invalid rank char")
     }
 }
 
 impl AddAssign<char> for Rank {
+    #[inline(always)]
     fn add_assign(&mut self, rhs: char) {
         *self = *self + rhs;
     }
 }
 
 impl SubAssign<char> for Rank {
+    #[inline(always)]
     fn sub_assign(&mut self, rhs: char) {
         *self = *self - rhs;
     }
@@ -1137,6 +1203,7 @@ impl SubAssign<char> for Rank {
 
 impl Mul<File> for Rank {
     type Output = Square;
+    #[inline(always)]
     fn mul(self, file: File) -> Self::Output {
         Square::new(file, self)
     }
@@ -1144,18 +1211,21 @@ impl Mul<File> for Rank {
 
 impl<T> Index<Rank> for [T; Rank::COUNT] {
     type Output = T;
+    #[inline(always)]
     fn index(&self, index: Rank) -> &Self::Output {
         &self[index.0 as usize]
     }
 }
 
 impl<T> IndexMut<Rank> for [T; Rank::COUNT] {
+    #[inline(always)]
     fn index_mut(&mut self, index: Rank) -> &mut Self::Output {
         &mut self[index.0 as usize]
     }
 }
 
 impl AsRef<str> for Rank {
+    #[inline(always)]
     fn as_ref(&self) -> &str {
         self.as_str()
     }
@@ -1193,6 +1263,7 @@ impl File {
     pub const COUNT: usize = 8;
 
     /// An array of all [`File`]s, in ascending order.
+    #[inline(always)]
     pub fn all() -> [Self; Self::COUNT] {
         [
             Self::A,
@@ -1216,10 +1287,12 @@ impl File {
     /// assert_eq!(iter.next().unwrap(), File::A);
     /// assert_eq!(iter.last().unwrap(), File::H);
     /// ```
+    #[inline(always)]
     pub fn iter() -> impl ExactSizeIterator<Item = Self> + DoubleEndedIterator<Item = Self> {
         Self::all().into_iter()
     }
 
+    #[inline(always)]
     pub fn new(file: u8) -> Result<Self> {
         if file > Self::MAX {
             bail!(
@@ -1231,10 +1304,12 @@ impl File {
         Ok(Self::new_unchecked(file))
     }
 
+    #[inline(always)]
     pub const fn new_unchecked(file: u8) -> Self {
         Self(file)
     }
 
+    #[inline(always)]
     pub fn from_char(file: char) -> Result<Self> {
         if !file.is_ascii_alphabetic() {
             bail!(
@@ -1259,10 +1334,12 @@ impl File {
     }
 
     /// `const` analog of `==`.
+    #[inline(always)]
     pub const fn is(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 
+    #[inline(always)]
     pub const fn inner(&self) -> u8 {
         self.0
     }
@@ -1270,14 +1347,17 @@ impl File {
     /// Obtain the inner value as a `usize`.
     ///
     /// Useful for indexing.
+    #[inline(always)]
     pub const fn index(&self) -> usize {
         self.inner() as usize
     }
 
+    #[inline(always)]
     pub const fn char(&self) -> char {
         (self.0 + b'a') as char
     }
 
+    #[inline(always)]
     pub const fn as_str(&self) -> &'static str {
         match self.0 {
             0 => "a",
@@ -1293,6 +1373,7 @@ impl File {
     }
 
     /// Alias for [`Bitboard::from_file`].
+    #[inline(always)]
     pub const fn bitboard(&self) -> Bitboard {
         Bitboard::from_file(*self)
     }
@@ -1308,18 +1389,21 @@ impl File {
     /// assert_eq!(File::C.offset(-1), Some(File::B));
     /// assert_eq!(File::A.offset(-1), None);
     /// ```
+    #[inline(always)]
     pub fn offset(self, delta: i8) -> Option<Self> {
         let bits = self.0.checked_add_signed(delta)?;
         (bits <= Self::MAX).then_some(Self::new_unchecked(bits))
     }
 
     /// Flips this [`File`].
+    #[inline(always)]
     pub const fn flipped(self) -> Self {
         Self(Self::MAX - self.0)
     }
 
     /// If `color` is White, does nothing.
     /// If `color` is Black, flips `self`.
+    #[inline(always)]
     pub const fn relative_to(self, color: Color) -> Self {
         match color {
             Color::White => self,
@@ -1334,6 +1418,7 @@ impl File {
     /// # use chessie_types::File;
     /// assert_eq!(File::B.abs_diff(File::H), 6);
     /// ```
+    #[inline(always)]
     pub const fn abs_diff(&self, other: Self) -> u8 {
         self.0.abs_diff(other.0)
     }
@@ -1343,12 +1428,14 @@ impl_binary_ops_with_num!(File);
 impl_try_from_num!(File);
 
 impl PartialEq<char> for File {
+    #[inline(always)]
     fn eq(&self, other: &char) -> bool {
         self.char().eq(other)
     }
 }
 
 impl PartialEq<str> for File {
+    #[inline(always)]
     fn eq(&self, other: &str) -> bool {
         self.as_str().eq(other)
     }
@@ -1356,12 +1443,14 @@ impl PartialEq<str> for File {
 
 impl TryFrom<char> for File {
     type Error = anyhow::Error;
+    #[inline(always)]
     fn try_from(value: char) -> Result<Self, Self::Error> {
         Self::from_char(value)
     }
 }
 
 impl From<Square> for File {
+    #[inline(always)]
     fn from(value: Square) -> Self {
         value.file()
     }
@@ -1369,6 +1458,7 @@ impl From<Square> for File {
 
 impl Add<char> for File {
     type Output = Self;
+    #[inline(always)]
     fn add(self, rhs: char) -> Self::Output {
         self + Self::from_char(rhs).expect("Attempted to add {self} with invalid file char")
     }
@@ -1376,18 +1466,21 @@ impl Add<char> for File {
 
 impl Sub<char> for File {
     type Output = Self;
+    #[inline(always)]
     fn sub(self, rhs: char) -> Self::Output {
         self - Self::from_char(rhs).expect("Attempted to sub {self} with invalid file char")
     }
 }
 
 impl AddAssign<char> for File {
+    #[inline(always)]
     fn add_assign(&mut self, rhs: char) {
         *self = *self + rhs;
     }
 }
 
 impl SubAssign<char> for File {
+    #[inline(always)]
     fn sub_assign(&mut self, rhs: char) {
         *self = *self - rhs;
     }
@@ -1395,6 +1488,7 @@ impl SubAssign<char> for File {
 
 impl Mul<Rank> for File {
     type Output = Square;
+    #[inline(always)]
     fn mul(self, rank: Rank) -> Self::Output {
         Square::new(self, rank)
     }
@@ -1402,18 +1496,21 @@ impl Mul<Rank> for File {
 
 impl<T> Index<File> for [T; File::COUNT] {
     type Output = T;
+    #[inline(always)]
     fn index(&self, index: File) -> &Self::Output {
         &self[index.0 as usize]
     }
 }
 
 impl<T> IndexMut<File> for [T; File::COUNT] {
+    #[inline(always)]
     fn index_mut(&mut self, index: File) -> &mut Self::Output {
         &mut self[index.0 as usize]
     }
 }
 
 impl AsRef<str> for File {
+    #[inline(always)]
     fn as_ref(&self) -> &str {
         self.as_str()
     }

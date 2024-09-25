@@ -309,21 +309,25 @@ fn generate_rider_mobility(deltas: &[(i8, i8)]) -> [Bitboard; Square::COUNT] {
 }
 
 /// Generates the default mobility for the King.
+#[inline(always)]
 fn generate_king_mobility() -> [Bitboard; 64] {
     generate_leaper_mobility(&QUEEN_DELTAS)
 }
 
 /// Generates the default mobility for the Knight.
+#[inline(always)]
 fn generate_knight_mobility() -> [Bitboard; 64] {
     generate_leaper_mobility(&KNIGHT_DELTAS)
 }
 
 /// Generates the default mobility for the Rook.
+#[inline(always)]
 fn generate_rook_mobility() -> [Bitboard; Square::COUNT] {
     generate_rider_mobility(&ROOK_DELTAS)
 }
 
 /// Generates the default mobility for the Bishop.
+#[inline(always)]
 fn generate_bishop_mobility() -> [Bitboard; Square::COUNT] {
     generate_rider_mobility(&BISHOP_DELTAS)
 }
