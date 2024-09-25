@@ -172,6 +172,67 @@ impl Game {
         self.checkers
     }
 
+    // TODO: Needs testing
+    /*
+    /// Checks if playing the provided [`Move`] is legal on the current position.
+    ///
+    /// This aims to be faster than playing the move and recalculating checkmasks and
+    /// whatnot by manually moving pieces around and recalculating enemy attacks.
+    /// In short, this function (re)moves (captures) appropriate piece(s) (castling),
+    /// computes all square attacked by enemy pieces,
+    /// and returns whether or not those attacks contain our King.
+    pub fn is_legal(&self, mv: Move) -> bool {
+        // Create a new board to work with
+        let mut board = self.board;
+
+        let from = mv.from();
+        let to = mv.to();
+
+        // Remove piece from origin square
+        let Some(mut piece) = board.take(from) else {
+            return false;
+        };
+        let color = piece.color();
+
+        // If it's a castle, we need to move the Rook
+        if mv.is_castle() {
+            // TODO: Chess960
+            let castle_index = mv.is_short_castle() as usize;
+            let old_rook_square = [Square::A1, Square::H1][castle_index].rank_relative_to(color);
+            let new_rook_square = [Square::D1, Square::F1][castle_index].rank_relative_to(color);
+
+            // Move the rook. The King is already handled before and after this if-statement
+            let Some(rook) = board.take(old_rook_square) else {
+                return false;
+            };
+            board.place(rook, new_rook_square);
+        }
+
+        // If it's en passant, we need to clear the space BEHIND this Pawn
+        if mv.is_en_passant() {
+            // Safety: En passant can only happen on ranks 3 and 6, so there is guaranteed to be a tile behind `to`
+            let ep_square = unsafe { to.backward_by(color, 1).unwrap_unchecked() };
+            board.clear(ep_square);
+        }
+
+        // Promote the pawn, if applicable
+        if let Some(promotion) = mv.promotion() {
+            piece = piece.promoted(promotion);
+        }
+
+        // Clear destination square and place piece on it
+        board.clear(to);
+        board.place(piece, to);
+
+        // Compute the enemy attacks to our King
+        let king_bb = board.king(color);
+        let enemy_attacks =
+            compute_attacks_to(&board, king_bb.to_square_unchecked(), color.opponent());
+
+        enemy_attacks.contains(&king_bb)
+    }
+     */
+
     /// Generate all legal moves from the current position.
     ///
     /// If you need all moves

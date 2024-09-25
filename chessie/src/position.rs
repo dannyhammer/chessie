@@ -49,7 +49,7 @@ impl CastlingRights {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Position {
     /// Bitboard representation of the game board.
-    board: Board,
+    pub(crate) board: Board,
 
     /// The [`Color`] of the current player.
     side_to_move: Color,
@@ -438,8 +438,8 @@ impl Position {
             self.ep_square = from.forward_by(color, 1);
             self.key.hash_optional_ep_square(self.ep_square());
         } else if mv.is_castle() {
-            let castle_index = mv.is_short_castle() as usize;
             // TODO: Chess960
+            let castle_index = mv.is_short_castle() as usize;
             let old_rook_square = [Square::A1, Square::H1][castle_index].rank_relative_to(color);
             let new_rook_square = [Square::D1, Square::F1][castle_index].rank_relative_to(color);
 
@@ -706,6 +706,9 @@ impl Board {
     }
 
     /// Places the provided [`Piece`] and the supplied [`Square`].
+    ///
+    /// If another piece occupies this square, this does *not* remove that piece.
+    /// Use [`Board::clear`] first.
     ///
     /// # Example
     /// ```
