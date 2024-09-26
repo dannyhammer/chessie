@@ -18,10 +18,6 @@ pub mod moves;
 pub mod perft;
 /// A chessboard, complete with piece placements, turn counters, and game state information.
 pub mod position;
-/// Pseudo-random number generation, written to be usable in `const` settings.
-///
-/// Primarily for Zobrist hashing.
-pub mod prng;
 /// Zobrist keys for hashing chess positions.
 pub mod zobrist;
 
@@ -30,7 +26,6 @@ pub use movegen::*;
 pub use moves::*;
 pub use perft::*;
 pub use position::*;
-pub use prng::*;
 pub use zobrist::*;
 
 /// Re-exports all the things you'll need.
@@ -40,7 +35,6 @@ pub mod prelude {
     pub use crate::moves::*;
     pub use crate::perft::*;
     pub use crate::position::*;
-    pub use crate::prng::*;
     pub use crate::utils::*;
     pub use crate::zobrist::*;
 }

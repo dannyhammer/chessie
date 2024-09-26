@@ -20,6 +20,13 @@ use super::{
     MoveKind, MoveList, Piece, PieceKind, Position, Rank, Square,
 };
 
+/// A game of chess.
+///
+/// This type encapsulates a [`Position`] and adds metadata about piece movements, such as all pieces currently checking the side-to-move's King.
+/// It is the primary type for working with a chess game, and is suitable for use in engines.
+///
+/// The basic methods you're probably looking for are [`Game::from_fen`], [`Game::make_move`], and [`Game::get_legal_moves`].
+/// You may also want to take a look at [`MoveGenIter`] for generating and enumerating moves one-by-one.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Game {
     /// The current [`Position`] of the game, including piece layouts, castling rights, turn counters, etc.
@@ -276,26 +283,49 @@ impl Game {
 
     /// Generate all legal moves from the current position.
     ///
-    /// If you need all moves
+    /// If you need all legal moves for the position, use this method.
+    /// If you want to incrementally generated moves one-by-one, use [`MoveGenIter`].
     #[inline(always)]
     pub fn get_legal_moves(&self) -> MoveList {
+        let friendlies = self.color(self.side_to_move());
+        self.get_legal_moves_from(friendlies)
+    }
+
+    /// Generate all legal moves from the current position that originate from squares in `mask`.
+    ///
+    /// # Example
+    /// ```
+    /// use chessie::{Game, Color};
+    /// let game = Game::default();
+    /// let mask = game.knights(Color::White);
+    /// let mut knight_moves = game.get_legal_moves_from(mask).into_iter();
+    ///
+    /// assert_eq!(knight_moves.next().unwrap(), "b1a3");
+    /// assert_eq!(knight_moves.next().unwrap(), "b1c3");
+    /// assert_eq!(knight_moves.next().unwrap(), "g1f3");
+    /// assert_eq!(knight_moves.next().unwrap(), "g1h3");
+    /// assert!(knight_moves.next().is_none());
+    /// ```
+    #[inline(always)]
+    pub fn get_legal_moves_from(&self, mask: Bitboard) -> MoveList {
         let mut moves = MoveList::default();
         match self.checkers().population() {
-            0 => self.generate_all_moves::<false>(&mut moves),
-            1 => self.generate_all_moves::<true>(&mut moves),
+            0 => self.generate_all_moves::<false>(mask, &mut moves),
+            1 => self.generate_all_moves::<true>(mask, &mut moves),
             // If we're in double check, we can only move the King
-            _ => self.generate_king_moves::<true>(&mut moves),
+            _ => self.generate_king_moves::<true>(mask, &mut moves),
         }
         moves
     }
 
+    /// Wrapper for all of the `generate_x_moves` methods.
     #[inline(always)]
-    fn generate_all_moves<const IN_CHECK: bool>(&self, moves: &mut MoveList) {
-        self.generate_pawn_moves::<IN_CHECK>(moves);
-        self.generate_knight_moves::<IN_CHECK>(moves);
-        self.generate_bishop_moves::<IN_CHECK>(moves);
-        self.generate_rook_moves::<IN_CHECK>(moves);
-        self.generate_king_moves::<IN_CHECK>(moves);
+    fn generate_all_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
+        self.generate_pawn_moves::<IN_CHECK>(mask, moves);
+        self.generate_knight_moves::<IN_CHECK>(mask, moves);
+        self.generate_bishop_moves::<IN_CHECK>(mask, moves);
+        self.generate_rook_moves::<IN_CHECK>(mask, moves);
+        self.generate_king_moves::<IN_CHECK>(mask, moves);
     }
 
     // fn generate_pawn_moves<const IN_CHECK: bool>(&self, moves: &mut MoveList) {
@@ -318,9 +348,10 @@ impl Game {
         moves.push(Move::new(from, to, kind));
     }
 
-    fn generate_pawn_moves<const IN_CHECK: bool>(&self, moves: &mut MoveList) {
+    /// Generates and serializes all legal Pawn moves.
+    fn generate_pawn_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
         let color = self.side_to_move();
-        for from in self.pawns(color) {
+        for from in self.pawns(color) & mask {
             let mobility = self.generate_legal_pawn_mobility::<IN_CHECK>(color, from);
 
             for to in mobility {
@@ -359,9 +390,10 @@ impl Game {
         }
     }
 
-    fn generate_knight_moves<const IN_CHECK: bool>(&self, moves: &mut MoveList) {
+    /// Generates and serializes all legal Knight moves.
+    fn generate_knight_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
         let color = self.side_to_move();
-        for from in self.knights(color) {
+        for from in self.knights(color) & mask {
             let attacks = knight_attacks(from);
             let mobility = self.generate_legal_normal_piece_mobility::<IN_CHECK>(from, attacks);
 
@@ -371,10 +403,11 @@ impl Game {
         }
     }
 
-    fn generate_bishop_moves<const IN_CHECK: bool>(&self, moves: &mut MoveList) {
+    /// Generates and serializes all legal Bishop moves.
+    fn generate_bishop_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
         let color = self.side_to_move();
         let blockers = self.occupied();
-        for from in self.diagonal_sliders(color) {
+        for from in self.diagonal_sliders(color) & mask {
             let attacks = bishop_attacks(from, blockers);
             let mobility = self.generate_legal_normal_piece_mobility::<IN_CHECK>(from, attacks);
 
@@ -384,10 +417,11 @@ impl Game {
         }
     }
 
-    fn generate_rook_moves<const IN_CHECK: bool>(&self, moves: &mut MoveList) {
+    /// Generates and serializes all legal Rook moves.
+    fn generate_rook_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
         let color = self.side_to_move();
         let blockers = self.occupied();
-        for from in self.orthogonal_sliders(color) {
+        for from in self.orthogonal_sliders(color) & mask {
             let attacks = rook_attacks(from, blockers);
             let mobility = self.generate_legal_normal_piece_mobility::<IN_CHECK>(from, attacks);
 
@@ -397,7 +431,14 @@ impl Game {
         }
     }
 
-    fn generate_king_moves<const IN_CHECK: bool>(&self, moves: &mut MoveList) {
+    /// Generates and serializes all legal King moves.
+    fn generate_king_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
+        if mask.is_disjoint(self.king_square) {
+            return;
+        }
+
+        // for from in self.king_square & mask {}
+
         let from = self.king_square;
         let color = self.side_to_move();
         for to in self.generate_legal_king_mobility::<IN_CHECK>(color, from) {
@@ -724,6 +765,7 @@ impl Game {
 
 impl Deref for Game {
     type Target = Position;
+    /// A [`Game`] immutably dereferences to a [`Position`], for simplicity.
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.position
@@ -732,6 +774,7 @@ impl Deref for Game {
 
 impl FromStr for Game {
     type Err = anyhow::Error;
+    /// Wrapper for [`Game::from_fen`]
     #[inline(always)]
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         Self::from_fen(s)
@@ -739,6 +782,7 @@ impl FromStr for Game {
 }
 
 impl Default for Game {
+    /// Standard starting position for Chess.
     #[inline(always)]
     fn default() -> Self {
         Self::new(Position::default())

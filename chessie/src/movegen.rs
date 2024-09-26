@@ -85,6 +85,9 @@ const BLACK_PAWN_ATTACKS: [Bitboard; 64] = unsafe {
     )))
 };
 
+/// An iterator over all legal moves in a specific position.
+///
+/// This is slower than calling [`Game::get_legal_moves`], but provides more flexibility (such as only generating captures).
 pub struct MoveGenIter<'a> {
     /// The [`Game`] to generate moves for.
     game: &'a Game,
@@ -299,7 +302,7 @@ pub fn compute_attackers_to(board: &Board, square: Square, color: Color) -> Bitb
         | (king_attacks(square) & board.king(color))
 }
 
-/// Computes a [`Bitboard`] of all squares attacked by [`color`].
+/// Computes a [`Bitboard`] of all squares attacked by `color`.
 pub fn compute_attacks_by(board: &Board, color: Color) -> Bitboard {
     let mut attacks = Bitboard::default();
     let blockers = board.occupied();

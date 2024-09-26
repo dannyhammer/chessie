@@ -6,7 +6,7 @@
 
 use std::{
     fmt,
-    ops::{Index, Not, Shl, Shr},
+    ops::{Index, Not},
     str::FromStr,
 };
 
@@ -772,33 +772,24 @@ impl FromStr for Bitboard {
 macro_rules! impl_bitwise_op {
     // Impl op and op_assign for Self
     ($op:tt, $op_assign:tt, $func:ident, $func_assign:ident) => {
-        impl std::ops::$op for Bitboard {
+        impl<T> std::ops::$op<T> for Bitboard
+        where
+            Self: From<T>,
+        {
             type Output = Self;
             #[inline(always)]
-            fn $func(self, rhs: Self) -> Self::Output {
-                Self(self.0.$func(rhs.0))
+            fn $func(self, rhs: T) -> Self::Output {
+                Self(self.0.$func(Self::from(rhs).0))
             }
         }
 
-        impl std::ops::$op_assign for Bitboard {
+        impl<T> std::ops::$op_assign<T> for Bitboard
+        where
+            Self: From<T>,
+        {
             #[inline(always)]
-            fn $func_assign(&mut self, rhs: Self) {
-                self.0.$func_assign(rhs.0);
-            }
-        }
-
-        impl std::ops::$op<Square> for Bitboard {
-            type Output = Self;
-            #[inline(always)]
-            fn $func(self, rhs: Square) -> Self::Output {
-                self.$func(rhs.bitboard())
-            }
-        }
-
-        impl std::ops::$op_assign<Square> for Bitboard {
-            #[inline(always)]
-            fn $func_assign(&mut self, rhs: Square) {
-                self.$func_assign(rhs.bitboard());
+            fn $func_assign(&mut self, rhs: T) {
+                self.0.$func_assign(Self::from(rhs).0);
             }
         }
     };
@@ -807,8 +798,6 @@ macro_rules! impl_bitwise_op {
 impl_bitwise_op!(BitAnd, BitAndAssign, bitand, bitand_assign);
 impl_bitwise_op!(BitOr, BitOrAssign, bitor, bitor_assign);
 impl_bitwise_op!(BitXor, BitXorAssign, bitxor, bitxor_assign);
-impl_bitwise_op!(Shl, ShlAssign, shl, shl_assign);
-impl_bitwise_op!(Shr, ShrAssign, shr, shr_assign);
 
 impl Not for Bitboard {
     type Output = Self;
@@ -818,42 +807,10 @@ impl Not for Bitboard {
     }
 }
 
-impl Shl<File> for Bitboard {
-    type Output = Self;
-    #[inline(always)]
-    fn shl(self, rhs: File) -> Self::Output {
-        Self::new(self.0 << rhs.0)
-    }
-}
-
-impl Shr<File> for Bitboard {
-    type Output = Self;
-    #[inline(always)]
-    fn shr(self, rhs: File) -> Self::Output {
-        Self::new(self.0 >> rhs.0)
-    }
-}
-
-impl Shl<Rank> for Bitboard {
-    type Output = Self;
-    #[inline(always)]
-    fn shl(self, rhs: Rank) -> Self::Output {
-        Self::new(self.0 << (rhs.0 * 8))
-    }
-}
-
-impl Shr<Rank> for Bitboard {
-    type Output = Self;
-    #[inline(always)]
-    fn shr(self, rhs: Rank) -> Self::Output {
-        Self::new(self.0 >> (rhs.0 * 8))
-    }
-}
-
 impl<T: Into<Bitboard>> Index<T> for Bitboard {
     type Output = bool;
 
-    /// Wrapper over [`Bitboard::get`].
+    /// Wrapper over [`Bitboard::intersects`].
     #[inline(always)]
     fn index(&self, index: T) -> &Self::Output {
         if self.intersects(index) {
@@ -868,7 +825,7 @@ impl<T> From<Option<T>> for Bitboard
 where
     Self: From<T>,
 {
-    /// If `value` is `None`, this yields an empty [`Bitboard`].
+    /// Wrapper for [`Bitboard::from_option`].
     #[inline(always)]
     fn from(value: Option<T>) -> Self {
         Self::from_option(value)
@@ -877,6 +834,7 @@ where
 
 impl From<Square> for Bitboard {
     #[inline(always)]
+    /// Wrapper for [`Bitboard::from_square`].
     fn from(value: Square) -> Self {
         Self::from_square(value)
     }
@@ -884,6 +842,7 @@ impl From<Square> for Bitboard {
 
 impl From<File> for Bitboard {
     #[inline(always)]
+    /// Wrapper for [`Bitboard::from_file`].
     fn from(value: File) -> Self {
         Self::from_file(value)
     }
@@ -891,6 +850,7 @@ impl From<File> for Bitboard {
 
 impl From<Rank> for Bitboard {
     #[inline(always)]
+    /// Wrapper for [`Bitboard::from_rank`].
     fn from(value: Rank) -> Self {
         Self::from_rank(value)
     }
@@ -898,6 +858,7 @@ impl From<Rank> for Bitboard {
 
 impl From<u64> for Bitboard {
     #[inline(always)]
+    /// Wrapper for [`Bitboard::new`].
     fn from(value: u64) -> Self {
         Self::new(value)
     }
@@ -905,6 +866,7 @@ impl From<u64> for Bitboard {
 
 impl From<bool> for Bitboard {
     #[inline(always)]
+    /// Wrapper for [`Bitboard::from_bool`].
     fn from(value: bool) -> Self {
         Self::from_bool(value)
     }

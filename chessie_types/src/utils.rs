@@ -7,9 +7,8 @@
 use std::path::Path;
 
 use anyhow::{bail, Result};
-use rand::random;
 
-use super::{Bitboard, Color, Rank, Square};
+use super::{Bitboard, Color, Rank, Square, XoShiRo};
 
 /// FEN string for the starting position of chess.
 pub const FEN_STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -469,9 +468,10 @@ fn find_magic(
     let blockers = compute_blockers(deltas, square);
     let shift = 64 - index_bits;
 
+    let mut prng = XoShiRo::new(); // Using this so we don't need `rand`
     loop {
         // Only a few bits are needed, so generate a random number with only a few bits set
-        let magic = random::<u64>() & random::<u64>() & random::<u64>();
+        let magic = prng.get_next() & prng.get_next() & prng.get_next();
 
         let magic_data = MagicBitboardData {
             blockers,

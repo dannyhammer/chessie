@@ -6,7 +6,7 @@
 
 use std::{
     fmt,
-    ops::{Add, AddAssign, Index, IndexMut, Mul, Sub, SubAssign},
+    ops::{Index, IndexMut, Mul},
     str::FromStr,
 };
 
@@ -679,7 +679,7 @@ impl Square {
 
 impl FromStr for Square {
     type Err = anyhow::Error;
-
+    /// Wrapper from [`Square::from_uci`].
     #[inline(always)]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::from_uci(s)
@@ -688,6 +688,7 @@ impl FromStr for Square {
 
 impl TryFrom<&str> for Square {
     type Error = anyhow::Error;
+    /// Wrapper from [`Square::from_uci`].
     #[inline(always)]
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Self::from_uci(value)
@@ -696,6 +697,7 @@ impl TryFrom<&str> for Square {
 
 impl TryFrom<String> for Square {
     type Error = anyhow::Error;
+    /// Wrapper from [`Square::from_uci`].
     #[inline(always)]
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::from_uci(&value)
@@ -704,6 +706,7 @@ impl TryFrom<String> for Square {
 
 impl TryFrom<usize> for Square {
     type Error = anyhow::Error;
+    /// Wrapper from [`Square::from_index`].
     #[inline(always)]
     fn try_from(value: usize) -> Result<Self, Self::Error> {
         Self::from_index(value)
@@ -712,82 +715,16 @@ impl TryFrom<usize> for Square {
 
 impl TryFrom<u8> for Square {
     type Error = anyhow::Error;
+    /// Wrapper from [`Square::from_bits`].
     #[inline(always)]
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         Self::from_bits(value)
     }
 }
 
-impl TryFrom<i32> for Square {
-    type Error = anyhow::Error;
-    #[inline(always)]
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        Self::from_bits(value as u8)
-    }
-}
-
-impl Add<Rank> for Square {
-    type Output = Self;
-    #[inline(always)]
-    fn add(self, rhs: Rank) -> Self::Output {
-        Self::new(self.file(), self.rank() + rhs)
-    }
-}
-
-impl Add<File> for Square {
-    type Output = Self;
-    #[inline(always)]
-    fn add(self, rhs: File) -> Self::Output {
-        Self::new(self.file() + rhs, self.rank())
-    }
-}
-
-impl Sub<Rank> for Square {
-    type Output = Self;
-    #[inline(always)]
-    fn sub(self, rhs: Rank) -> Self::Output {
-        Self::new(self.file(), self.rank() - rhs)
-    }
-}
-
-impl Sub<File> for Square {
-    type Output = Self;
-    #[inline(always)]
-    fn sub(self, rhs: File) -> Self::Output {
-        Self::new(self.file() - rhs, self.rank())
-    }
-}
-
-impl AddAssign<Rank> for Square {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Rank) {
-        *self = *self + rhs;
-    }
-}
-
-impl SubAssign<Rank> for Square {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: Rank) {
-        *self = *self - rhs;
-    }
-}
-
-impl AddAssign<File> for Square {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: File) {
-        *self = *self + rhs;
-    }
-}
-
-impl SubAssign<File> for Square {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: File) {
-        *self = *self - rhs;
-    }
-}
-
 impl<T> Index<Square> for [T; Square::COUNT] {
     type Output = T;
+    /// A [`Square`] can be used to index into an array of 64 elements.
     #[inline(always)]
     fn index(&self, index: Square) -> &Self::Output {
         &self[index.index()]
@@ -795,6 +732,7 @@ impl<T> Index<Square> for [T; Square::COUNT] {
 }
 
 impl<T> IndexMut<Square> for [T; Square::COUNT] {
+    /// A [`Square`] can be used to mutably index into an array of 64 elements.
     #[inline(always)]
     fn index_mut(&mut self, index: Square) -> &mut Self::Output {
         &mut self[index.index()]
@@ -803,6 +741,7 @@ impl<T> IndexMut<Square> for [T; Square::COUNT] {
 
 impl<T> Index<Square> for [[T; File::COUNT]; Rank::COUNT] {
     type Output = T;
+    /// A [`Square`] can be used to index into an 2D array of 8x8 elements.
     #[inline(always)]
     fn index(&self, index: Square) -> &Self::Output {
         &self[index.file()][index.rank()]
@@ -810,6 +749,7 @@ impl<T> Index<Square> for [[T; File::COUNT]; Rank::COUNT] {
 }
 
 impl<T> IndexMut<Square> for [[T; File::COUNT]; Rank::COUNT] {
+    /// A [`Square`] can be used to mutably index into an 2D array of 8x8 elements.
     #[inline(always)]
     fn index_mut(&mut self, index: Square) -> &mut Self::Output {
         &mut self[index.file()][index.rank()]
@@ -817,12 +757,14 @@ impl<T> IndexMut<Square> for [[T; File::COUNT]; Rank::COUNT] {
 }
 
 impl fmt::Display for Square {
+    /// Calls [`Square::to_uci`].
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.to_uci())
     }
 }
 
 impl fmt::Debug for Square {
+    /// Calls [`Square::to_uci`] and also displays the internal decimal value.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} ({})", self.to_uci(), self.0)
     }
@@ -1073,12 +1015,6 @@ macro_rules! impl_try_from_num {
 macro_rules! impl_binary_ops_with_num {
     // Entrypoint; impl ops on everything
     ($t: ty) => {
-        // Implement ops on Self
-        impl_binary_ops_with_num!($t, Add, AddAssign, add, add_assign, +);
-        impl_binary_ops_with_num!($t, Sub, SubAssign, sub, sub_assign, -);
-        impl_binary_ops_with_num!($t, Mul, MulAssign, mul, mul_assign, *);
-        impl_binary_ops_with_num!($t, Div, DivAssign, div, div_assign, /);
-
         // Implement ops on primitives
         impl_binary_ops_with_num!($t, u8);
         impl_binary_ops_with_num!($t, u16);
@@ -1104,7 +1040,9 @@ macro_rules! impl_binary_ops_with_num {
     ($t:ty, $op:tt, $op_assign:tt, $func:ident, $func_assign:ident, $op_tok:tt) => {
         impl std::ops::$op for $t {
             type Output = Self;
-    #[inline(always)]
+            /// # Panics
+            /// If the operation would cause overflow
+            #[inline(always)]
             fn $func(self, rhs: Self) -> Self::Output {
                 Self::new(self.0 $op_tok rhs.0)
                     .expect("Attempted to add {self} and {rhs}, which is beyond Rank's bounds")
@@ -1112,7 +1050,9 @@ macro_rules! impl_binary_ops_with_num {
         }
 
         impl std::ops::$op_assign for $t {
-    #[inline(always)]
+            /// # Panics
+            /// If the operation would cause overflow
+            #[inline(always)]
             fn $func_assign(&mut self, rhs: Self) {
                 *self = *self $op_tok rhs;
             }
@@ -1123,7 +1063,9 @@ macro_rules! impl_binary_ops_with_num {
     ($t:ty, $rhs:ty, $op:tt, $op_assign:tt, $func:ident, $func_assign:ident, $op_tok:tt) => {
         impl std::ops::$op<$rhs> for $t {
             type Output = Self;
-    #[inline(always)]
+            /// # Panics
+            /// If the operation would cause overflow
+            #[inline(always)]
             fn $func(self, rhs: $rhs) -> Self::Output {
                 Self::new(self.0 $op_tok rhs as u8)
                     .expect("Attempted to add {self} and {rhs}, which is beyond Rank's bounds")
@@ -1131,7 +1073,9 @@ macro_rules! impl_binary_ops_with_num {
         }
 
         impl std::ops::$op_assign<$rhs> for $t {
-    #[inline(always)]
+            /// # Panics
+            /// If the operation would cause overflow
+            #[inline(always)]
             fn $func_assign(&mut self, rhs: $rhs) {
                 *self = *self $op_tok rhs;
             }
@@ -1168,36 +1112,6 @@ impl From<Square> for Rank {
     #[inline(always)]
     fn from(value: Square) -> Self {
         value.rank()
-    }
-}
-
-impl Add<char> for Rank {
-    type Output = Self;
-    #[inline(always)]
-    fn add(self, rhs: char) -> Self::Output {
-        self + Self::from_char(rhs).expect("Attempted to add {self} with invalid rank char")
-    }
-}
-
-impl Sub<char> for Rank {
-    type Output = Self;
-    #[inline(always)]
-    fn sub(self, rhs: char) -> Self::Output {
-        self - Self::from_char(rhs).expect("Attempted to sub {self} with invalid rank char")
-    }
-}
-
-impl AddAssign<char> for Rank {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: char) {
-        *self = *self + rhs;
-    }
-}
-
-impl SubAssign<char> for Rank {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: char) {
-        *self = *self - rhs;
     }
 }
 
@@ -1456,36 +1370,6 @@ impl From<Square> for File {
     }
 }
 
-impl Add<char> for File {
-    type Output = Self;
-    #[inline(always)]
-    fn add(self, rhs: char) -> Self::Output {
-        self + Self::from_char(rhs).expect("Attempted to add {self} with invalid file char")
-    }
-}
-
-impl Sub<char> for File {
-    type Output = Self;
-    #[inline(always)]
-    fn sub(self, rhs: char) -> Self::Output {
-        self - Self::from_char(rhs).expect("Attempted to sub {self} with invalid file char")
-    }
-}
-
-impl AddAssign<char> for File {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: char) {
-        *self = *self + rhs;
-    }
-}
-
-impl SubAssign<char> for File {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: char) {
-        *self = *self - rhs;
-    }
-}
-
 impl Mul<Rank> for File {
     type Output = Square;
     #[inline(always)]
@@ -1570,16 +1454,15 @@ mod tests {
 
         // Now test squares as a whole
         assert_eq!(Square::try_from("a1").unwrap(), Square::A1);
-        assert_eq!(Square::try_from(0).unwrap(), Square::A1);
+        assert_eq!(Square::try_from(0u8).unwrap(), Square::A1);
         assert_eq!(Square::try_from("h8").unwrap(), Square::H8);
-        assert_eq!(Square::try_from(63).unwrap(), Square::H8);
+        assert_eq!(Square::try_from(63usize).unwrap(), Square::H8);
         assert_eq!(Square::try_from("d4").unwrap(), Square::D4);
 
         assert!(Square::try_from("a").is_err());
         assert!(Square::try_from("1").is_err());
         assert!(Square::try_from("").is_err());
-        assert!(Square::try_from(-1).is_err());
-        assert!(Square::try_from(64).is_err());
+        assert!(Square::try_from(64u8).is_err());
     }
 
     #[test]
