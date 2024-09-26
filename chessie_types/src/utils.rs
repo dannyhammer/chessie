@@ -7,9 +7,8 @@
 use std::path::Path;
 
 use anyhow::{bail, Result};
-use rand::random;
 
-use super::{Bitboard, Color, Rank, Square};
+use super::{Bitboard, Color, Rank, Square, XoShiRo};
 
 /// FEN string for the starting position of chess.
 pub const FEN_STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -227,9 +226,9 @@ fn generate_pawn_pushes(color: Color) -> [Bitboard; 64] {
         let bb = Bitboard::from_square(square);
 
         if square.rank() == Rank::second(color) {
-            boards[square] = bb.advance_by(color, 1) | bb.advance_by(color, 2);
+            boards[square] = bb.forward_by(color, 1) | bb.forward_by(color, 2);
         } else {
-            boards[square] = bb.advance_by(color, 1);
+            boards[square] = bb.forward_by(color, 1);
         }
     }
     boards
@@ -243,7 +242,7 @@ fn generate_pawn_attacks(color: Color) -> [Bitboard; 64] {
     for square in Square::iter() {
         let bb = Bitboard::from_square(square);
 
-        boards[square] = bb.advance_by(color, 1).east() | bb.advance_by(color, 1).west();
+        boards[square] = bb.forward_by(color, 1).east() | bb.forward_by(color, 1).west();
     }
     boards
 }
@@ -309,21 +308,25 @@ fn generate_rider_mobility(deltas: &[(i8, i8)]) -> [Bitboard; Square::COUNT] {
 }
 
 /// Generates the default mobility for the King.
+#[inline(always)]
 fn generate_king_mobility() -> [Bitboard; 64] {
     generate_leaper_mobility(&QUEEN_DELTAS)
 }
 
 /// Generates the default mobility for the Knight.
+#[inline(always)]
 fn generate_knight_mobility() -> [Bitboard; 64] {
     generate_leaper_mobility(&KNIGHT_DELTAS)
 }
 
 /// Generates the default mobility for the Rook.
+#[inline(always)]
 fn generate_rook_mobility() -> [Bitboard; Square::COUNT] {
     generate_rider_mobility(&ROOK_DELTAS)
 }
 
 /// Generates the default mobility for the Bishop.
+#[inline(always)]
 fn generate_bishop_mobility() -> [Bitboard; Square::COUNT] {
     generate_rider_mobility(&BISHOP_DELTAS)
 }
@@ -441,7 +444,7 @@ fn compute_blocked_attacks(deltas: &[(i8, i8)], square: Square, blockers: Bitboa
         let mut ray = square;
 
         // Loop until we encounter the first occupied square
-        while !blockers.get(ray) {
+        while !blockers.intersects(ray) {
             // If we have not moved off the edge of the board, add this square to the attack bitboard
             if let Some(shifted) = ray.offset(*df, *dr) {
                 ray = shifted;
@@ -465,9 +468,10 @@ fn find_magic(
     let blockers = compute_blockers(deltas, square);
     let shift = 64 - index_bits;
 
+    let mut prng = XoShiRo::new(); // Using this so we don't need `rand`
     loop {
         // Only a few bits are needed, so generate a random number with only a few bits set
-        let magic = random::<u64>() & random::<u64>() & random::<u64>();
+        let magic = prng.get_next() & prng.get_next() & prng.get_next();
 
         let magic_data = MagicBitboardData {
             blockers,

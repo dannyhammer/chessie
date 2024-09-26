@@ -6,7 +6,7 @@
 
 use std::{
     fmt,
-    ops::{Index, Not, Shl, Shr},
+    ops::{Index, Not},
     str::FromStr,
 };
 
@@ -35,7 +35,7 @@ use super::{Color, File, Rank, Square};
 /// 00000000
 /// 11111111
 /// ```
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct Bitboard(pub(crate) u64);
 
@@ -78,23 +78,9 @@ impl Bitboard {
     /// let board = Bitboard::new(255);
     /// assert_eq!(board.to_hex_string(), "0x00000000000000FF");
     /// ```
+    #[inline(always)]
     pub const fn new(bits: u64) -> Self {
         Self(bits)
-    }
-
-    /// Constructs a new [`Bitboard`] from the provided index.
-    ///
-    /// The resulting [`Bitboard`] will have only a single bit toggled on.
-    ///
-    /// # Example
-    /// ```
-    /// # use chessie_types::Bitboard;
-    /// let board = Bitboard::from_index(63);
-    /// assert_eq!(board.to_hex_string(), "0x8000000000000000");
-    /// ```
-    pub const fn from_index(index: usize) -> Self {
-        debug_assert!(index < 64, "Index must be between [0,64)");
-        Self::from_square(Square::from_index_unchecked(index))
     }
 
     /// Constructs a new [`Bitboard`] from the provided [`Square`].
@@ -107,6 +93,7 @@ impl Bitboard {
     /// let board = Bitboard::from_square(Square::H8);
     /// assert_eq!(board.to_hex_string(), "0x8000000000000000");
     /// ```
+    #[inline(always)]
     pub const fn from_square(square: Square) -> Self {
         Self(1 << square.index())
     }
@@ -121,6 +108,7 @@ impl Bitboard {
     /// let board = Bitboard::from_file(File::F);
     /// assert_eq!(board.to_hex_string(), "0x2020202020202020");
     /// ```
+    #[inline(always)]
     pub const fn from_file(file: File) -> Self {
         Self::new(Self::FILE_A.0 << file.0)
     }
@@ -135,6 +123,7 @@ impl Bitboard {
     /// let board = Bitboard::from_rank(Rank::SEVEN);
     /// assert_eq!(board.to_hex_string(), "0x00FF000000000000");
     /// ```
+    #[inline(always)]
     pub const fn from_rank(rank: Rank) -> Self {
         Self::new(Self::RANK_1.0 << (rank.0 * 8))
     }
@@ -148,6 +137,7 @@ impl Bitboard {
     /// assert_eq!(Bitboard::from_bool(true), Bitboard::FULL_BOARD);
     /// assert_eq!(Bitboard::from_bool(false), Bitboard::EMPTY_BOARD);
     /// ```
+    #[inline(always)]
     pub const fn from_bool(value: bool) -> Self {
         Self((value as u64).wrapping_neg() & u64::MAX)
     }
@@ -162,15 +152,12 @@ impl Bitboard {
     /// assert_eq!(Bitboard::from_option(Some(Square::A1)), Square::A1.bitboard());
     /// assert_eq!(Bitboard::from_option::<Square>(None), Bitboard::EMPTY_BOARD);
     /// ```
+    #[inline(always)]
     pub fn from_option<T>(value: Option<T>) -> Self
     where
         Self: From<T>,
     {
-        if let Some(t) = value {
-            Self::from(t)
-        } else {
-            Self::default()
-        }
+        value.map(Self::from).unwrap_or_default()
     }
 
     /// Returns a [`Bitboard`] of this [`Color`]'s first rank.
@@ -182,6 +169,7 @@ impl Bitboard {
     /// assert_eq!(Bitboard::first_rank(Color::White), Bitboard::RANK_1);
     /// assert_eq!(Bitboard::first_rank(Color::Black), Bitboard::RANK_8);
     /// ```
+    #[inline(always)]
     pub const fn first_rank(color: Color) -> Self {
         [Self::RANK_1, Self::RANK_8][color.index()]
     }
@@ -195,6 +183,7 @@ impl Bitboard {
     /// assert_eq!(Bitboard::second_rank(Color::White), Bitboard::RANK_2);
     /// assert_eq!(Bitboard::second_rank(Color::Black), Bitboard::RANK_7);
     /// ```
+    #[inline(always)]
     pub const fn second_rank(color: Color) -> Self {
         [Self::RANK_2, Self::RANK_7][color.index()]
     }
@@ -208,6 +197,7 @@ impl Bitboard {
     /// assert_eq!(Bitboard::third_rank(Color::White), Bitboard::RANK_3);
     /// assert_eq!(Bitboard::third_rank(Color::Black), Bitboard::RANK_6);
     /// ```
+    #[inline(always)]
     pub const fn third_rank(color: Color) -> Self {
         [Self::RANK_3, Self::RANK_6][color.index()]
     }
@@ -221,6 +211,7 @@ impl Bitboard {
     /// assert_eq!(Bitboard::seventh_rank(Color::White), Bitboard::RANK_7);
     /// assert_eq!(Bitboard::seventh_rank(Color::Black), Bitboard::RANK_2);
     /// ```
+    #[inline(always)]
     pub const fn seventh_rank(color: Color) -> Self {
         [Self::RANK_7, Self::RANK_2][color.index()]
     }
@@ -234,11 +225,13 @@ impl Bitboard {
     /// assert_eq!(Bitboard::eighth_rank(Color::White), Bitboard::RANK_8);
     /// assert_eq!(Bitboard::eighth_rank(Color::Black), Bitboard::RANK_1);
     /// ```
+    #[inline(always)]
     pub const fn eighth_rank(color: Color) -> Self {
         [Self::RANK_8, Self::RANK_1][color.index()]
     }
 
     /// Returns the inner `u64` of this [`Bitboard`].
+    #[inline(always)]
     pub const fn inner(&self) -> u64 {
         self.0
     }
@@ -251,9 +244,10 @@ impl Bitboard {
     /// # Example
     /// ```
     /// # use chessie_types::{Bitboard, Square};
-    /// let board = Bitboard::from_index(14);
+    /// let board = Bitboard::from_square(Square::G2);
     /// assert_eq!(board.to_square_unchecked(), Square::G2);
     /// ```
+    #[inline(always)]
     pub const fn to_square_unchecked(&self) -> Square {
         Square::from_index_unchecked(self.0.trailing_zeros() as usize)
     }
@@ -266,11 +260,12 @@ impl Bitboard {
     /// # Example
     /// ```
     /// # use chessie_types::{Bitboard, Square};
-    /// let board = Bitboard::from_index(14);
+    /// let board = Bitboard::from_square(Square::G2);
     /// assert_eq!(board.to_square(), Some(Square::G2));
     /// let invalid = Bitboard::RANK_1;
     /// assert_eq!(invalid.to_square(), None);
     /// ```
+    #[inline(always)]
     pub const fn to_square(&self) -> Option<Square> {
         if self.population() == 1 {
             Some(self.to_square_unchecked())
@@ -283,13 +278,14 @@ impl Bitboard {
     ///
     /// # Example
     /// ```
-    /// # use chessie_types::{Bitboard, Rank};
-    /// let board = Bitboard::from_rank(Rank::SEVEN);
+    /// # use chessie_types::Bitboard;
+    /// let board = Bitboard::RANK_7;
     /// assert_eq!(board.to_hex_string(), "0x00FF000000000000");
     ///
     /// let flipped = board.flipped();
     /// assert_eq!(flipped.to_hex_string(), "0x000000000000FF00");
     /// ```
+    #[inline(always)]
     pub const fn flipped(&self) -> Self {
         Self(self.0.swap_bytes())
     }
@@ -305,6 +301,7 @@ impl Bitboard {
     /// assert_eq!(Bitboard::RANK_2.relative_to(Color::White), Bitboard::RANK_2);
     /// assert_eq!(Bitboard::RANK_2.relative_to(Color::Black), Bitboard::RANK_7);
     /// ```
+    #[inline(always)]
     pub const fn relative_to(self, color: Color) -> Self {
         match color {
             Color::White => self,
@@ -312,7 +309,7 @@ impl Bitboard {
         }
     }
 
-    /// Checks if this [`Bitboard`] is empty, or all zeros.
+    /// Checks if this [`Bitboard`] is empty, meaning all bits are set to `0`.
     ///
     /// # Example
     /// ```
@@ -320,11 +317,12 @@ impl Bitboard {
     /// let board = Bitboard::new(0x0);
     /// assert!(board.is_empty());
     /// ```
+    #[inline(always)]
     pub const fn is_empty(&self) -> bool {
         self.0 == 0
     }
 
-    /// Checks if this [`Bitboard`] is NOT empty, or contains at least one `1`.
+    /// Checks if this [`Bitboard`] is NOT empty, or contains at least one set bit.
     ///
     /// # Example
     /// ```
@@ -332,38 +330,86 @@ impl Bitboard {
     /// let board = Bitboard::CORNERS;
     /// assert!(board.is_nonempty());
     /// ```
+    #[inline(always)]
     pub const fn is_nonempty(&self) -> bool {
         self.0 != 0
     }
 
-    /// Checks if this [`Bitboard`] contains any of the bits within `other`.
+    /// Returns `true` if `self` contains *every* bit set in `other`.
     ///
     /// # Example
     /// ```
-    /// # use chessie_types::Bitboard;
+    /// # use chessie_types::{Bitboard, Square};
+    /// // Works on single squares
+    /// let e4 = Bitboard::from_square(Square::E4);
+    /// assert!(e4.is_superset(Square::E4));
+    ///
+    /// // ...multiple squares
+    /// assert!(Bitboard::FULL_BOARD.is_superset(Bitboard::CORNERS));
+    ///
+    /// // ...and overlaps
     /// let rank_1 = Bitboard::RANK_1;
     /// let rank_5 = Bitboard::RANK_5;
-    /// let file_a = Bitboard::FILE_A;
-    /// assert_eq!(rank_1.contains(&file_a), true);
-    /// assert_eq!(rank_1.contains(&rank_5), false);
+    /// assert!(rank_1.is_superset(Square::E1));
+    /// assert!(!rank_1.is_superset(rank_5));
     /// ```
-    pub const fn contains(&self, other: &Self) -> bool {
-        self.0 & other.0 != 0
+    #[inline(always)]
+    pub fn is_superset(&self, other: impl Into<Self>) -> bool {
+        let other = other.into();
+        (*self & other) == other
     }
 
-    /*
-    /// Returns `true` if `self` contains every bit set in `other`.
-    pub const fn contains_all(&self, other: &Self) -> bool {
-        self.0 & other.0 == other.0
+    /// Returns `true` if `other` contains *every* bit set in `self`.
+    ///
+    /// Wrapper for `other.is_superset(self)`, since those are logically equivalent statements.
+    #[inline(always)]
+    pub fn is_subset(&self, other: impl Into<Self>) -> bool {
+        other.into().is_superset(*self)
     }
 
-    /// Returns `true` if `self` contains none bits set in `other`.
-    pub const fn contains_none(&self, other: &Self) -> bool {
-        self.0 & other.0 != 0
+    /// Returns `true` if `self` contains none of the bits set in `other`.
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie_types::{Bitboard, Square};
+    /// // Works on single squares
+    /// let e4 = Bitboard::from_square(Square::E4);
+    /// assert!(e4.is_disjoint(Square::A1));
+    ///
+    /// // ...multiple squares
+    /// assert!(Bitboard::EDGES.is_disjoint(Bitboard::CENTER));
+    ///
+    /// // ...and overlaps
+    /// assert!(Bitboard::RANK_1.is_disjoint(Bitboard::RANK_5));
+    /// assert!(!Bitboard::RANK_1.is_disjoint(Square::A1));
+    /// ```
+    #[inline(always)]
+    pub fn is_disjoint(&self, other: impl Into<Self>) -> bool {
+        (*self & other.into()).is_empty()
     }
-     */
 
-    /// Toggles the bit corresponding to the location of the provided [`Square`] to `1` (on).
+    /// Returns `true` if `self` contains *any* of the bits set in `other`.
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie_types::{Bitboard, Square};
+    /// // Works on single squares
+    /// let e4 = Bitboard::from_square(Square::E4);
+    /// assert!(e4.intersects(Square::E4));
+    ///
+    /// // ...multiple squares
+    /// assert!(Bitboard::FILE_A.intersects(Square::A3));
+    ///
+    /// // ...and overlaps
+    /// assert!(Bitboard::RANK_1.intersects(Bitboard::FILE_A));
+    /// assert!(!Bitboard::RANK_1.intersects(Bitboard::RANK_5));
+    /// ```
+    #[inline(always)]
+    pub fn intersects(&self, other: impl Into<Self>) -> bool {
+        (*self & other.into()).is_nonempty()
+    }
+
+    /// Sets the bit(s) at the location(s) specified by `other` to `1` (on).
     ///
     /// # Example
     /// ```
@@ -372,23 +418,29 @@ impl Bitboard {
     /// board.set(Square::G2);
     /// assert_eq!(board.to_hex_string(), "0x0000000000004000");
     /// ```
-    pub fn set(&mut self, square: Square) {
-        self.set_index(square.index());
+    #[inline(always)]
+    pub fn set(&mut self, other: impl Into<Self>) {
+        *self |= other.into()
     }
 
-    /// Gets the value of the bit corresponding to the location of the provided [`Square`].
+    /// Toggles (inverts/negates) the bit(s) at the location(s) specified by `other`.
     ///
     /// # Example
     /// ```
     /// # use chessie_types::{Bitboard, Square};
-    /// let board = Bitboard::FILE_A;
-    /// assert!(board.get(Square::A3));
+    /// let mut board = Bitboard::RANK_1;
+    /// assert_eq!(board.to_hex_string(), "0x00000000000000FF");
+    /// board.toggle(Square::C1);
+    /// assert_eq!(board.to_hex_string(), "0x00000000000000FB");
+    /// board.toggle(Square::C1);
+    /// assert_eq!(board.to_hex_string(), "0x00000000000000FF");
     /// ```
-    pub const fn get(&self, square: Square) -> bool {
-        self.get_index(square.index())
+    #[inline(always)]
+    pub fn toggle(&mut self, other: impl Into<Self>) {
+        *self ^= other.into()
     }
 
-    /// Toggles the bit corresponding to the location of the provided [`Square`] to `0` (off).
+    /// Clears the bit(s) at the location(s) specified by `other` to `0` (off).
     ///
     /// # Example
     /// ```
@@ -397,18 +449,15 @@ impl Bitboard {
     /// board.clear(Square::C1);
     /// assert_eq!(board.to_hex_string(), "0x00000000000000FB");
     /// ```
-    pub fn clear(&mut self, square: Square) {
-        self.clear_index(square.index())
-    }
-
-    /// Remove all squares from `other` in `self`
-    pub fn remove(&mut self, other: &Self) {
-        self.0 &= !other.0
+    #[inline(always)]
+    pub fn clear(&mut self, other: impl Into<Self>) {
+        *self &= !other.into()
     }
 
     /// Returns the index of the lowest non-zero bit of this [`Bitboard`], as a [`Square`].
     ///
     /// If `self` is empty, this yields `None`,
+    #[inline(always)]
     pub fn lsb(&self) -> Option<Square> {
         self.is_nonempty()
             .then(|| Square(self.0.trailing_zeros() as u8))
@@ -417,6 +466,7 @@ impl Bitboard {
     /// Returns the index of the lowest non-zero bit of this [`Bitboard`], as a [`Square`].
     ///
     /// It is undefined behavior to call this function when `self` is empty.
+    #[inline(always)]
     pub fn lsb_unchecked(&self) -> Square {
         Square(self.0.trailing_zeros() as u8)
     }
@@ -424,6 +474,7 @@ impl Bitboard {
     /// Pops and returns the index of the lowest non-zero bit of this [`Bitboard`], as a [`Square`].
     ///
     /// If `self` is empty, this yields `None`,
+    #[inline(always)]
     pub fn pop_lsb(&mut self) -> Option<Square> {
         let lsb = self.lsb();
         self.clear_lsb();
@@ -431,55 +482,19 @@ impl Bitboard {
     }
 
     /// Clears the lowest non-zero bit from `self`, if there is a square to clear.
+    #[inline(always)]
     pub fn clear_lsb(&mut self) {
         self.0 &= self.0.wrapping_sub(1);
     }
 
-    /// Toggles the bit corresponding to the specified [`Square`].
-    pub fn toggle_square(&mut self, square: Square) {
-        *self ^= Self::from_square(square);
-    }
-
-    /// Toggles the bit at `index`.
-    pub fn toggle_index(&mut self, index: usize) {
-        *self ^= Self::from_index(index);
-    }
-
-    /// Sets the bit at `index` to `1`.
-    ///
-    /// # Panics
-    /// If `index > 63` with debug assertions enabled.
-    fn set_index(&mut self, index: usize) {
-        debug_assert!(index < 64, "Index must be between [0,64)");
-        // self.0 |= 1 << index;
-        *self |= Self::from_index(index);
-    }
-
-    /// Returns `true` if the bit at `index` is set, else `false`.
-    ///
-    /// # Panics
-    /// If `index > 63` with debug assertions enabled.
-    const fn get_index(&self, index: usize) -> bool {
-        debug_assert!(index < 64, "Index must be between [0,64)");
-        (self.0 & 1 << index) != 0
-    }
-
-    /// Sets the bit at `index` to `0`.
-    ///
-    /// # Panics
-    /// If `index > 63` with debug assertions enabled.
-    fn clear_index(&mut self, index: usize) {
-        debug_assert!(index < 64, "Index must be between [0,64)");
-        // self.0 ^= 1 << index;
-        *self ^= Self::from_index(index);
-    }
-
     /// Returns a [`BitboardIter`] to iterate over all of the set bits as [`Square`]s.
+    #[inline(always)]
     pub const fn iter(&self) -> BitboardIter {
         BitboardIter { bitboard: *self }
     }
 
     /// Returns a [`BitboardSubsetIter`] to iterate over all of the subsets of this bitboard.
+    #[inline(always)]
     pub const fn subsets(&self) -> BitboardSubsetIter {
         BitboardSubsetIter {
             bitboard: *self,
@@ -498,6 +513,7 @@ impl Bitboard {
     /// let board = Bitboard::RANK_1;
     /// assert_eq!(board.population(), 8);
     /// ```
+    #[inline(always)]
     pub const fn population(&self) -> u8 {
         self.0.count_ones() as u8
     }
@@ -512,12 +528,13 @@ impl Bitboard {
     /// ```
     /// # use chessie_types::{Bitboard, Color};
     /// let rank4 = Bitboard::RANK_4;
-    /// assert_eq!(rank4.advance_by(Color::White, 1), Bitboard::RANK_5);
-    /// assert_eq!(rank4.advance_by(Color::Black, 1), Bitboard::RANK_3);
+    /// assert_eq!(rank4.forward_by(Color::White, 1), Bitboard::RANK_5);
+    /// assert_eq!(rank4.forward_by(Color::Black, 1), Bitboard::RANK_3);
     /// // Wrapping
-    /// assert_eq!(rank4.advance_by(Color::White, 5), Bitboard::RANK_1);
+    /// assert_eq!(rank4.forward_by(Color::White, 5), Bitboard::RANK_1);
     /// ```
-    pub const fn advance_by(self, color: Color, n: u32) -> Self {
+    #[inline(always)]
+    pub const fn forward_by(self, color: Color, n: u32) -> Self {
         // Black magic: If `color` is White, this rotates left by 8, which is the same as "n ranks up"
         // If `color` is Black, this rotates left by 496, which is the same as rotating right by 8, or "n ranks down"
         Self(self.0.rotate_left(n * 8 * (1 + color as u32 * 62)))
@@ -533,12 +550,13 @@ impl Bitboard {
     /// ```
     /// # use chessie_types::{Bitboard, Color};
     /// let rank4 = Bitboard::RANK_4;
-    /// assert_eq!(rank4.retreat_by(Color::White, 1), Bitboard::RANK_3);
-    /// assert_eq!(rank4.retreat_by(Color::Black, 1), Bitboard::RANK_5);
+    /// assert_eq!(rank4.backward_by(Color::White, 1), Bitboard::RANK_3);
+    /// assert_eq!(rank4.backward_by(Color::Black, 1), Bitboard::RANK_5);
     /// // Wrapping
-    /// assert_eq!(rank4.retreat_by(Color::Black, 5), Bitboard::RANK_1);
+    /// assert_eq!(rank4.backward_by(Color::Black, 5), Bitboard::RANK_1);
     /// ```
-    pub const fn retreat_by(self, color: Color, n: u32) -> Self {
+    #[inline(always)]
+    pub const fn backward_by(self, color: Color, n: u32) -> Self {
         // Black magic: If `color` is White, this rotates right by 8, which is the same as "n ranks down"
         // If `color` is Black, this rotates right by 496, which is the same as rotating left by 8, or "n ranks up"
         Self(self.0.rotate_right(n * 8 * (1 + color as u32 * 62)))
@@ -554,6 +572,7 @@ impl Bitboard {
     /// assert_eq!(Bitboard::RANK_4.north(), Bitboard::RANK_5);
     /// assert_eq!(Bitboard::RANK_8.north(), Bitboard::EMPTY_BOARD);
     /// ```
+    #[inline(always)]
     pub const fn north(self) -> Self {
         Self(self.0 << 8)
     }
@@ -569,6 +588,7 @@ impl Bitboard {
     /// assert_eq!(Bitboard::RANK_4.south(), Bitboard::RANK_3);
     /// assert_eq!(Bitboard::RANK_1.south(), Bitboard::EMPTY_BOARD);
     /// ```
+    #[inline(always)]
     pub const fn south(self) -> Self {
         Self(self.0 >> 8)
     }
@@ -583,6 +603,7 @@ impl Bitboard {
     /// assert_eq!(Bitboard::FILE_C.east(), Bitboard::FILE_D);
     /// assert_eq!(Bitboard::FILE_H.east(), Bitboard::EMPTY_BOARD);
     /// ```
+    #[inline(always)]
     pub const fn east(self) -> Self {
         // Post-shift mask
         Self((self.0 << 1) & Self::NOT_FILE_A.0)
@@ -598,6 +619,7 @@ impl Bitboard {
     /// assert_eq!(Bitboard::FILE_C.west(), Bitboard::FILE_B);
     /// assert_eq!(Bitboard::FILE_A.west(), Bitboard::EMPTY_BOARD);
     /// ```
+    #[inline(always)]
     pub const fn west(self) -> Self {
         // Post-shift mask
         Self((self.0 >> 1) & Self::NOT_FILE_H.0)
@@ -608,6 +630,7 @@ impl Bitboard {
     /// If already at the edge, returns an empty board.
     ///
     /// This operation is faster than calling [`Bitboard::north`] and [`Bitboard::east`] separately.
+    #[inline(always)]
     pub const fn northeast(self) -> Self {
         // Post-shift mask
         Self((self.0 << 9) & Self::NOT_FILE_A.0)
@@ -618,6 +641,7 @@ impl Bitboard {
     /// If already at the edge, returns an empty board.
     ///
     /// This operation is faster than calling [`Bitboard::south`] and [`Bitboard::east`] separately.
+    #[inline(always)]
     pub const fn southeast(self) -> Self {
         // Post-shift mask
         Self((self.0 >> 7) & Self::NOT_FILE_A.0)
@@ -628,6 +652,7 @@ impl Bitboard {
     /// If already at the edge, returns an empty board.
     ///
     /// This operation is faster than calling [`Bitboard::north`] and [`Bitboard::west`] separately.
+    #[inline(always)]
     pub const fn northwest(self) -> Self {
         // Post-shift mask
         Self((self.0 << 7) & Self::NOT_FILE_H.0)
@@ -638,6 +663,7 @@ impl Bitboard {
     /// If already at the edge, returns an empty board.
     ///
     /// This operation is faster than calling [`Bitboard::south`] and [`Bitboard::west`] separately.
+    #[inline(always)]
     pub const fn southwest(self) -> Self {
         // Post-shift mask
         Self((self.0 >> 9) & Self::NOT_FILE_H.0)
@@ -667,6 +693,7 @@ impl Bitboard {
     /// `const` analog of [`std::ops::BitAnd::bitand`].
     ///
     /// Returns the bitwise AND (`&`) of `self` and `other`.
+    #[inline(always)]
     pub const fn and(self, other: Self) -> Self {
         Self(self.0 & other.0)
     }
@@ -674,6 +701,7 @@ impl Bitboard {
     /// `const` analog of [`std::ops::BitOr::bitor`].
     ///
     /// Returns the bitwise OR (`|`) of `self` and `other`.
+    #[inline(always)]
     pub const fn or(self, other: Self) -> Self {
         Self(self.0 | other.0)
     }
@@ -681,6 +709,7 @@ impl Bitboard {
     /// `const` analog of [`std::ops::BitXor::bitxor`].
     ///
     /// Returns the bitwise XOR (`^`) of `self` and `other`.
+    #[inline(always)]
     pub const fn xor(self, other: Self) -> Self {
         Self(self.0 ^ other.0)
     }
@@ -688,11 +717,13 @@ impl Bitboard {
     /// `const` analog of [`Not::not`].
     ///
     /// Returns the logical negation (`!`) of `self`, flipping all `1`'s to `0`'s and vice versa.
+    #[inline(always)]
     pub const fn not(self) -> Self {
         Self(!self.0)
     }
 
     /// Formats this [`Bitboard`] as a hexadecimal string.
+    #[inline(always)]
     pub fn to_hex_string(&self) -> String {
         format!("0x{:0>16X}", self.0)
     }
@@ -741,29 +772,24 @@ impl FromStr for Bitboard {
 macro_rules! impl_bitwise_op {
     // Impl op and op_assign for Self
     ($op:tt, $op_assign:tt, $func:ident, $func_assign:ident) => {
-        impl std::ops::$op for Bitboard {
+        impl<T> std::ops::$op<T> for Bitboard
+        where
+            Self: From<T>,
+        {
             type Output = Self;
-            fn $func(self, rhs: Self) -> Self::Output {
-                Self(self.0.$func(rhs.0))
+            #[inline(always)]
+            fn $func(self, rhs: T) -> Self::Output {
+                Self(self.0.$func(Self::from(rhs).0))
             }
         }
 
-        impl std::ops::$op_assign for Bitboard {
-            fn $func_assign(&mut self, rhs: Self) {
-                self.0.$func_assign(rhs.0);
-            }
-        }
-
-        impl std::ops::$op<Square> for Bitboard {
-            type Output = Self;
-            fn $func(self, rhs: Square) -> Self::Output {
-                self.$func(rhs.bitboard())
-            }
-        }
-
-        impl std::ops::$op_assign<Square> for Bitboard {
-            fn $func_assign(&mut self, rhs: Square) {
-                self.$func_assign(rhs.bitboard());
+        impl<T> std::ops::$op_assign<T> for Bitboard
+        where
+            Self: From<T>,
+        {
+            #[inline(always)]
+            fn $func_assign(&mut self, rhs: T) {
+                self.0.$func_assign(Self::from(rhs).0);
             }
         }
     };
@@ -772,64 +798,22 @@ macro_rules! impl_bitwise_op {
 impl_bitwise_op!(BitAnd, BitAndAssign, bitand, bitand_assign);
 impl_bitwise_op!(BitOr, BitOrAssign, bitor, bitor_assign);
 impl_bitwise_op!(BitXor, BitXorAssign, bitxor, bitxor_assign);
-impl_bitwise_op!(Shl, ShlAssign, shl, shl_assign);
-impl_bitwise_op!(Shr, ShrAssign, shr, shr_assign);
 
 impl Not for Bitboard {
     type Output = Self;
+    #[inline(always)]
     fn not(self) -> Self::Output {
         Self(!self.0)
     }
 }
 
-impl Shl<File> for Bitboard {
-    type Output = Self;
-    fn shl(self, rhs: File) -> Self::Output {
-        Self::new(self.0 << rhs.0)
-    }
-}
-
-impl Shr<File> for Bitboard {
-    type Output = Self;
-    fn shr(self, rhs: File) -> Self::Output {
-        Self::new(self.0 >> rhs.0)
-    }
-}
-
-impl Shl<Rank> for Bitboard {
-    type Output = Self;
-    fn shl(self, rhs: Rank) -> Self::Output {
-        Self::new(self.0 << (rhs.0 * 8))
-    }
-}
-
-impl Shr<Rank> for Bitboard {
-    type Output = Self;
-    fn shr(self, rhs: Rank) -> Self::Output {
-        Self::new(self.0 >> (rhs.0 * 8))
-    }
-}
-
-impl Index<Square> for Bitboard {
+impl<T: Into<Bitboard>> Index<T> for Bitboard {
     type Output = bool;
-    /// A [`Bitboard`] can be indexed by a [`Square`] to yield `true` or `false`, if the bit at that index is set.
-    fn index(&self, index: Square) -> &Self::Output {
-        if self.get_index(index.index()) {
-            &true
-        } else {
-            &false
-        }
-    }
-}
 
-impl Index<usize> for Bitboard {
-    type Output = bool;
-    /// A [`Bitboard`] can be indexed by a [`usize`] to yield `true` or `false`, if the bit at that index is set.
-    ///
-    /// # Panics
-    /// If debug assertions are enabled and `index > 63`.
-    fn index(&self, index: usize) -> &Self::Output {
-        if self.get_index(index) {
+    /// Wrapper over [`Bitboard::intersects`].
+    #[inline(always)]
+    fn index(&self, index: T) -> &Self::Output {
+        if self.intersects(index) {
             &true
         } else {
             &false
@@ -841,37 +825,48 @@ impl<T> From<Option<T>> for Bitboard
 where
     Self: From<T>,
 {
-    /// If `value` is `None`, this yields an empty [`Bitboard`].
+    /// Wrapper for [`Bitboard::from_option`].
+    #[inline(always)]
     fn from(value: Option<T>) -> Self {
         Self::from_option(value)
     }
 }
 
 impl From<Square> for Bitboard {
+    #[inline(always)]
+    /// Wrapper for [`Bitboard::from_square`].
     fn from(value: Square) -> Self {
         Self::from_square(value)
     }
 }
 
 impl From<File> for Bitboard {
+    #[inline(always)]
+    /// Wrapper for [`Bitboard::from_file`].
     fn from(value: File) -> Self {
         Self::from_file(value)
     }
 }
 
 impl From<Rank> for Bitboard {
+    #[inline(always)]
+    /// Wrapper for [`Bitboard::from_rank`].
     fn from(value: Rank) -> Self {
         Self::from_rank(value)
     }
 }
 
 impl From<u64> for Bitboard {
+    #[inline(always)]
+    /// Wrapper for [`Bitboard::new`].
     fn from(value: u64) -> Self {
         Self::new(value)
     }
 }
 
 impl From<bool> for Bitboard {
+    #[inline(always)]
+    /// Wrapper for [`Bitboard::from_bool`].
     fn from(value: bool) -> Self {
         Self::from_bool(value)
     }
@@ -898,6 +893,13 @@ impl fmt::Binary for Bitboard {
     }
 }
 
+impl Default for Bitboard {
+    #[inline(always)]
+    fn default() -> Self {
+        Self::EMPTY_BOARD
+    }
+}
+
 impl fmt::Display for Bitboard {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Allocate just enough capacity
@@ -906,7 +908,7 @@ impl fmt::Display for Bitboard {
         for rank in Rank::iter().rev() {
             for file in File::iter() {
                 let square = Square::new(file, rank);
-                let occupant = if self.get(square) { 'X' } else { '.' };
+                let occupant = if self.intersects(square) { 'X' } else { '.' };
 
                 board += &format!("{occupant} ");
             }
@@ -927,7 +929,7 @@ impl fmt::Debug for Bitboard {
 
             for file in File::iter() {
                 let square = Square::new(file, rank);
-                let occupant = if self.get(square) { 'X' } else { '.' };
+                let occupant = if self.intersects(square) { 'X' } else { '.' };
 
                 board += &format!("{occupant} ");
             }
@@ -955,6 +957,7 @@ pub struct BitboardIter {
 
 impl Iterator for BitboardIter {
     type Item = Square;
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         self.bitboard.pop_lsb()
     }
@@ -966,6 +969,7 @@ impl Iterator for BitboardIter {
 }
 
 impl ExactSizeIterator for BitboardIter {
+    #[inline(always)]
     fn len(&self) -> usize {
         self.bitboard.population() as usize
     }
@@ -974,6 +978,7 @@ impl ExactSizeIterator for BitboardIter {
 impl IntoIterator for Bitboard {
     type Item = Square;
     type IntoIter = BitboardIter;
+    #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         BitboardIter { bitboard: self }
     }
@@ -982,6 +987,7 @@ impl IntoIterator for Bitboard {
 impl IntoIterator for &Bitboard {
     type Item = Square;
     type IntoIter = BitboardIter;
+    #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         BitboardIter { bitboard: *self }
     }
@@ -990,6 +996,7 @@ impl IntoIterator for &Bitboard {
 impl IntoIterator for &mut Bitboard {
     type Item = Square;
     type IntoIter = BitboardIter;
+    #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         BitboardIter { bitboard: *self }
     }
@@ -1029,12 +1036,14 @@ impl Iterator for BitboardSubsetIter {
         }
     }
 
+    #[inline(always)]
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.remaining, Some(self.remaining))
     }
 }
 
 impl ExactSizeIterator for BitboardSubsetIter {
+    #[inline(always)]
     fn len(&self) -> usize {
         self.remaining
     }

@@ -28,11 +28,13 @@ impl Color {
     pub const COUNT: usize = 2;
 
     /// An array of both colors, starting with White.
+    #[inline(always)]
     pub const fn all() -> [Self; Self::COUNT] {
         [Self::White, Self::Black]
     }
 
     /// An iterator over both colors, starting with White.
+    #[inline(always)]
     pub fn iter() -> impl Iterator<Item = Self> {
         Self::all().into_iter()
     }
@@ -54,6 +56,7 @@ impl Color {
     /// let err = Color::from_bits(42);
     /// assert!(err.is_err());
     /// ```
+    #[inline(always)]
     pub fn from_bits(bits: u8) -> Result<Self> {
         match bits {
             0 => Ok(Self::White),
@@ -79,6 +82,7 @@ impl Color {
     /// let err = Color::from_bits(42);
     /// assert!(err.is_err());
     /// ```
+    #[inline(always)]
     pub const fn from_bits_unchecked(bits: u8) -> Self {
         debug_assert!(
             bits <= 1,
@@ -100,16 +104,19 @@ impl Color {
     /// let black = Color::from_bool(true);
     /// assert_eq!(black, Color::Black);
     /// ```
+    #[inline(always)]
     pub const fn from_bool(color: bool) -> Self {
         Self::from_bits_unchecked(color as u8)
     }
 
     /// Returns `true` if this [`Color`] is White.
+    #[inline(always)]
     pub const fn is_white(&self) -> bool {
         *self as u8 & 1 == 0
     }
 
     /// Returns `true` if this [`Color`] is Black.
+    #[inline(always)]
     pub const fn is_black(&self) -> bool {
         *self as u8 & 1 != 0
     }
@@ -122,6 +129,7 @@ impl Color {
     /// assert_eq!(Color::White.negation_multiplier(), 1);
     /// assert_eq!(Color::Black.negation_multiplier(), -1);
     /// ```
+    #[inline(always)]
     pub const fn negation_multiplier(&self) -> i8 {
         // TODO: Which of these 3 is faster?
 
@@ -146,6 +154,7 @@ impl Color {
     /// assert_eq!(Color::White.opponent(), Color::Black);
     /// assert_eq!(Color::Black.opponent(), Color::White);
     /// ```
+    #[inline(always)]
     pub const fn opponent(&self) -> Self {
         Self::from_bits_unchecked(self.bits() ^ 1)
     }
@@ -162,6 +171,7 @@ impl Color {
     /// assert_eq!(Color::White.index(), 0);
     /// assert_eq!(Color::Black.index(), 1);
     /// ```
+    #[inline(always)]
     pub const fn index(&self) -> usize {
         *self as usize
     }
@@ -178,6 +188,7 @@ impl Color {
     /// assert_eq!(Color::White.bits(), 0);
     /// assert_eq!(Color::Black.bits(), 1);
     /// ```
+    #[inline(always)]
     pub const fn bits(&self) -> u8 {
         *self as u8
     }
@@ -194,6 +205,7 @@ impl Color {
     /// let err = Color::from_uci('x');
     /// assert!(err.is_err());
     /// ```
+    #[inline(always)]
     pub fn from_uci(color: char) -> Result<Self> {
         match color {
             'w' | 'W' => Ok(Self::White),
@@ -211,6 +223,7 @@ impl Color {
     /// # use chessie_types::Color;
     /// assert_eq!(Color::from_case('k'), Color::Black);
     /// ```
+    #[inline(always)]
     pub const fn from_case(c: char) -> Self {
         Self::from_bool(c.is_ascii_lowercase())
     }
@@ -222,6 +235,7 @@ impl Color {
     /// # use chessie_types::Color;
     /// assert_eq!(Color::White.to_uci(), 'w');
     /// ```
+    #[inline(always)]
     pub const fn to_uci(&self) -> char {
         match self {
             Self::White => 'w',
@@ -236,6 +250,7 @@ impl Color {
     /// # use chessie_types::Color;
     /// assert_eq!(Color::White.as_str(), "w");
     /// ```
+    #[inline(always)]
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::White => "w",
@@ -251,6 +266,7 @@ impl Color {
     /// let white = Color::White;
     /// assert_eq!(white.name(), "white");
     /// ```
+    #[inline(always)]
     pub const fn name(&self) -> &'static str {
         match self {
             Self::White => "white",
@@ -262,6 +278,7 @@ impl Color {
 impl Neg for Color {
     type Output = Self;
     /// Negating [`Color::White`] yields [`Color::Black`] and vice versa.
+    #[inline(always)]
     fn neg(self) -> Self::Output {
         self.opponent()
     }
@@ -288,6 +305,7 @@ impl PieceKind {
     /// An array of all 6 [`PieceKind`]s.
     ///
     /// In the order: `Pawn`, `Knight`, `Bishop`, `Rook`, `Queen`, `King`.
+    #[inline(always)]
     pub const fn all() -> [Self; Self::COUNT] {
         use PieceKind::*;
         [Pawn, Knight, Bishop, Rook, Queen, King]
@@ -296,12 +314,14 @@ impl PieceKind {
     /// An array of 5 non-King [`PieceKind`]s.
     ///
     /// In the order: `Pawn`, `Knight`, `Bishop`, `Rook`, `Queen`.
+    #[inline(always)]
     pub const fn all_except_king() -> [Self; Self::COUNT - 1] {
         use PieceKind::*;
         [Pawn, Knight, Bishop, Rook, Queen]
     }
 
     /// An iterator over all [`PieceKind`]s, starting with Pawn.
+    #[inline(always)]
     pub fn iter() -> impl Iterator<Item = Self> {
         Self::all().into_iter()
     }
@@ -323,6 +343,7 @@ impl PieceKind {
     /// let err = PieceKind::from_bits(42);
     /// assert!(err.is_err());
     /// ```
+    #[inline(always)]
     pub fn from_bits(bits: u8) -> Result<Self> {
         match bits {
             0 => Ok(Self::Pawn),
@@ -348,6 +369,7 @@ impl PieceKind {
     /// let queen = PieceKind::from_bits_unchecked(4);
     /// assert_eq!(queen, PieceKind::Queen);
     /// ```
+    #[inline(always)]
     pub const fn from_bits_unchecked(bits: u8) -> Self {
         debug_assert!(
             bits <= 5,
@@ -368,6 +390,7 @@ impl PieceKind {
     /// let bits = PieceKind::Queen.bits();
     /// assert_eq!(bits, 4);
     /// ```
+    #[inline(always)]
     pub const fn bits(&self) -> u8 {
         *self as u8
     }
@@ -384,6 +407,7 @@ impl PieceKind {
     /// let index = PieceKind::Queen.index();
     /// assert_eq!(index, 4);
     /// ```
+    #[inline(always)]
     pub const fn index(&self) -> usize {
         *self as usize
     }
@@ -399,6 +423,7 @@ impl PieceKind {
     /// assert!(queen.is_ok());
     /// assert_eq!(queen.unwrap(), PieceKind::Queen);
     /// ```
+    #[inline(always)]
     pub fn from_uci(kind: char) -> Result<Self> {
         match kind {
             'P' | 'p' => Ok(Self::Pawn),
@@ -419,6 +444,7 @@ impl PieceKind {
     /// let queen = PieceKind::Queen;
     /// assert_eq!(queen.name(), "queen");
     /// ```
+    #[inline(always)]
     pub const fn name(&self) -> &'static str {
         match self {
             Self::Pawn => "pawn",
@@ -440,6 +466,7 @@ impl PieceKind {
     /// let queen = PieceKind::Queen;
     /// assert_eq!(queen.to_uci(), 'q');
     /// ```
+    #[inline(always)]
     pub const fn to_uci(&self) -> char {
         match self {
             Self::Pawn => 'p',
@@ -452,6 +479,7 @@ impl PieceKind {
     }
 
     /// Alias for [`PieceKind::to_uci`].
+    #[inline(always)]
     pub const fn char(&self) -> char {
         self.to_uci()
     }
@@ -466,6 +494,7 @@ impl PieceKind {
     /// let queen = PieceKind::Queen;
     /// assert_eq!(queen.as_str(), "q");
     /// ```
+    #[inline(always)]
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Pawn => "p",
@@ -523,6 +552,7 @@ impl Piece {
     /// let white_knight = Piece::new(Color::White, PieceKind::Knight);
     /// assert_eq!(white_knight.to_string(), "N");
     /// ```
+    #[inline(always)]
     pub const fn new(color: Color, kind: PieceKind) -> Self {
         // 0000 0000 => white
         // 0000 1000 => black
@@ -537,6 +567,7 @@ impl Piece {
     /// let white_knight = Piece::new(Color::White, PieceKind::Knight);
     /// assert_eq!(white_knight.color(), Color::White);
     /// ```
+    #[inline(always)]
     pub const fn color(&self) -> Color {
         Color::from_bits_unchecked(self.0 >> Self::COLOR_BITS)
     }
@@ -549,6 +580,7 @@ impl Piece {
     /// assert!(Piece::WHITE_KNIGHT.is_white());
     /// assert!(!Piece::BLACK_KNIGHT.is_white());
     /// ```
+    #[inline(always)]
     pub const fn is_white(&self) -> bool {
         self.0 >> Self::COLOR_BITS == 0
     }
@@ -561,6 +593,7 @@ impl Piece {
     /// assert!(Piece::BLACK_KNIGHT.is_black());
     /// assert!(!Piece::WHITE_KNIGHT.is_black());
     /// ```
+    #[inline(always)]
     pub const fn is_black(&self) -> bool {
         self.0 >> Self::COLOR_BITS != 0
     }
@@ -573,42 +606,50 @@ impl Piece {
     /// let white_knight = Piece::new(Color::White, PieceKind::Knight);
     /// assert_eq!(white_knight.kind(), PieceKind::Knight);
     /// ```
+    #[inline(always)]
     pub const fn kind(&self) -> PieceKind {
         // Clear the color bit
         PieceKind::from_bits_unchecked(self.0 & !Self::COLOR_MASK)
     }
 
     /// Returns `true` if this [`Piece`] is a Pawn.
+    #[inline(always)]
     pub const fn is_pawn(&self) -> bool {
         matches!(self.kind(), PieceKind::Pawn)
     }
 
     /// Returns `true` if this [`Piece`] is a Knight.
+    #[inline(always)]
     pub const fn is_knight(&self) -> bool {
         matches!(self.kind(), PieceKind::Knight)
     }
 
     /// Returns `true` if this [`Piece`] is a Bishop.
+    #[inline(always)]
     pub const fn is_bishop(&self) -> bool {
         matches!(self.kind(), PieceKind::Bishop)
     }
 
     /// Returns `true` if this [`Piece`] is a Rook.
+    #[inline(always)]
     pub const fn is_rook(&self) -> bool {
         matches!(self.kind(), PieceKind::Rook)
     }
 
     /// Returns `true` if this [`Piece`] is a Queen.
+    #[inline(always)]
     pub const fn is_queen(&self) -> bool {
         matches!(self.kind(), PieceKind::Queen)
     }
 
     /// Returns `true` if this [`Piece`] is a King.
+    #[inline(always)]
     pub const fn is_king(&self) -> bool {
         matches!(self.kind(), PieceKind::King)
     }
 
     /// Returns `true` if this [`Piece`] is a slider (Rook, Bishop, Queen).
+    #[inline(always)]
     pub const fn is_slider(&self) -> bool {
         matches!(
             self.kind(),
@@ -617,16 +658,19 @@ impl Piece {
     }
 
     /// Returns `true` if this [`Piece`] is an orthogonal slider (Rook, Queen).
+    #[inline(always)]
     pub const fn is_orthogonal_slider(&self) -> bool {
         matches!(self.kind(), PieceKind::Queen | PieceKind::Rook)
     }
 
     /// Returns `true` if this [`Piece`] is a diagonal slider (Bishop, Queen).
+    #[inline(always)]
     pub const fn is_diagonal_slider(&self) -> bool {
         matches!(self.kind(), PieceKind::Queen | PieceKind::Bishop)
     }
 
     /// Fetches the [`Color`] and [`PieceKind`] of this [`Piece`].
+    #[inline(always)]
     pub const fn parts(&self) -> (Color, PieceKind) {
         (self.color(), self.kind())
     }
@@ -634,6 +678,7 @@ impl Piece {
     /// Returns the index value of this [`Piece`], as a `usize`.
     ///
     /// Useful for indexing into lists of size 6 or 12.
+    #[inline(always)]
     pub const fn index(&self) -> usize {
         let offset = if self.is_white() {
             0
@@ -655,6 +700,7 @@ impl Piece {
     /// assert_eq!(white_knight.color(), Color::White);
     /// assert_eq!(white_knight.kind(), PieceKind::Knight);
     /// ```
+    #[inline(always)]
     pub fn from_uci(piece: char) -> Result<Self> {
         let kind = PieceKind::from_uci(piece)?;
         let color = Color::from_case(piece);
@@ -669,6 +715,7 @@ impl Piece {
     /// let white_knight = Piece::new(Color::White, PieceKind::Knight);
     /// assert_eq!(white_knight.to_uci(), 'N');
     /// ```
+    #[inline(always)]
     pub const fn to_uci(&self) -> char {
         if self.is_white() {
             self.kind().char().to_ascii_uppercase()
@@ -678,6 +725,7 @@ impl Piece {
     }
 
     /// Alias for [`Piece::to_uci`].
+    #[inline(always)]
     pub const fn char(&self) -> char {
         self.to_uci()
     }
@@ -690,6 +738,7 @@ impl Piece {
     /// assert_eq!(Piece::WHITE_QUEEN.as_str(), "Q");
     /// assert_eq!(Piece::BLACK_PAWN.as_str(), "p");
     /// ```
+    #[inline(always)]
     pub const fn as_str(&self) -> &'static str {
         match self.color() {
             Color::White => match self.kind() {
@@ -723,6 +772,7 @@ impl Piece {
     /// assert_eq!(queen.kind(), PieceKind::Queen);
     /// assert_eq!(queen.color(), Color::Black);
     /// ```
+    #[inline(always)]
     pub const fn promoted(self, promotion: PieceKind) -> Self {
         Self::new(self.color(), promotion)
     }
@@ -736,6 +786,7 @@ impl Piece {
     /// let pawn = queen.demoted();
     /// assert_eq!(pawn.kind(), PieceKind::Pawn);
     /// ```
+    #[inline(always)]
     pub const fn demoted(self) -> Self {
         self.promoted(PieceKind::Pawn)
     }
@@ -749,6 +800,7 @@ impl Piece {
     /// let michael_jackson = king.inverted();
     /// assert_eq!(michael_jackson.color(), Color::White);
     /// ```
+    #[inline(always)]
     pub fn inverted(self) -> Self {
         Self::new(self.color().opponent(), self.kind())
     }
@@ -761,6 +813,7 @@ impl Piece {
     /// let white_queen = Piece::WHITE_QUEEN;
     /// assert_eq!(white_queen.name(), "white queen");
     /// ```
+    #[inline(always)]
     pub fn name(&self) -> String {
         format!("{} {}", self.color().name(), self.kind().name())
     }
@@ -769,6 +822,7 @@ impl Piece {
 impl<T> Index<Piece> for [T; PieceKind::COUNT] {
     type Output = T;
     /// [`Piece`] can be used to index into a list of six elements.
+    #[inline(always)]
     fn index(&self, index: Piece) -> &Self::Output {
         &self[index.kind().index()]
     }
@@ -776,6 +830,7 @@ impl<T> Index<Piece> for [T; PieceKind::COUNT] {
 
 impl<T> IndexMut<Piece> for [T; PieceKind::COUNT] {
     /// [`Piece`] can be used to index into a list of six elements.
+    #[inline(always)]
     fn index_mut(&mut self, index: Piece) -> &mut Self::Output {
         &mut self[index.kind().index()]
     }
@@ -786,6 +841,7 @@ macro_rules! impl_common_traits {
         impl<T> Index<$type> for [T; <$type>::COUNT] {
             type Output = T;
             /// [`$type`] can be used to index into a list of [`<$type>::COUNT`] elements.
+            #[inline(always)]
             fn index(&self, index: $type) -> &Self::Output {
                 &self[index.index()]
             }
@@ -793,6 +849,7 @@ macro_rules! impl_common_traits {
 
         impl<T> IndexMut<$type> for [T; <$type>::COUNT] {
             /// [`$type`] can be used to mutably index into a list of [`<$type>::COUNT`] elements.
+            #[inline(always)]
             fn index_mut(&mut self, index: $type) -> &mut Self::Output {
                 &mut self[index.index()]
             }
@@ -801,6 +858,7 @@ macro_rules! impl_common_traits {
         impl FromStr for $type {
             type Err = anyhow::Error;
             /// Does the same as [`Self::from_uci`], but only if `s` is one character in length.
+            #[inline(always)]
             fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
                 if s.len() != 1 {
                     bail!("Invalid str for <$type>: Must be a str of len 1. Got {s:?}");
@@ -812,6 +870,7 @@ macro_rules! impl_common_traits {
 
         impl AsRef<str> for $type {
             /// Alias for [`Self::as_str`].
+            #[inline(always)]
             fn as_ref(&self) -> &str {
                 self.as_str()
             }

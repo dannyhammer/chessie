@@ -19,21 +19,25 @@ pub struct XoShiRo([u64; 4]);
 
 impl XoShiRo {
     /// Construct a new pseudo-random number generator from the library's seeds.
+    #[inline(always)]
     pub const fn new() -> Self {
         Self::from_seeds(SEEDS)
     }
 
     /// Construct a new pseudo-random number generator from your own seeds.
+    #[inline(always)]
     pub const fn from_seeds(seeds: [u64; 4]) -> Self {
         Self(seeds)
     }
 
     /// Generates the next pseudo-random number in the sequence.
+    #[inline(always)]
     pub fn get_next(&mut self) -> u64 {
         Self::xoshiro(self.0).0
     }
 
     /// `const` analog of [`XoShiRo::get_next`], returning `(next, Self)`.
+    #[inline(always)]
     pub const fn get_next_const(self) -> (u64, Self) {
         let (result, s) = Self::xoshiro(self.0);
         (result, Self(s))
@@ -58,6 +62,7 @@ impl XoShiRo {
 }
 
 impl Default for XoShiRo {
+    #[inline(always)]
     fn default() -> Self {
         Self::new()
     }

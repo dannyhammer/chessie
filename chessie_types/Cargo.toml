@@ -1,6 +1,6 @@
 [package]
 name = "chessie_types"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 authors = ["Danny Hammer <hammerapi@gmail.com>"]
 license = "MPL-2.0"
@@ -10,4 +10,3 @@ homepage = "https://github.com/dannyhammer/chessie"
 
 [dependencies]
 anyhow = "1.0.86"
-rand = "0.8.5"
