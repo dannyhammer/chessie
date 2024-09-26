@@ -220,9 +220,15 @@ pub fn perft_full(position: &Position, depth: usize) -> PerftResult {
 ///
 /// This performs bulk counting, meaning that, at depth 1, it returns the number of available moves,
 /// rather than making them, recursing again, and returning 1 for each terminal case.
+#[inline(always)]
 pub fn perft(game: &Game, depth: usize) -> u64 {
+    perft_generic::<true>(game, depth)
+}
+
+/// Generic version of `perft` that allows you to specify whether to perform bulk counting or not.
+pub fn perft_generic<const BULK: bool>(game: &Game, depth: usize) -> u64 {
     // Bulk counting; no need to recurse again just to apply a singular move and return 1.
-    if depth == 1 {
+    if BULK && depth == 1 {
         return game.get_legal_moves().len() as u64;
     }
     // Recursion limit; return 1, since we're fathoming this node.
@@ -232,6 +238,6 @@ pub fn perft(game: &Game, depth: usize) -> u64 {
 
     // Recursively accumulate the nodes from the remaining depths
     game.get_legal_moves().into_iter().fold(0, |nodes, mv| {
-        nodes + perft(&game.with_move_made(mv), depth - 1)
+        nodes + perft_generic::<BULK>(&game.with_move_made(mv), depth - 1)
     })
 }

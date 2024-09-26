@@ -35,7 +35,7 @@ use super::{Color, File, Rank, Square};
 /// 00000000
 /// 11111111
 /// ```
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct Bitboard(pub(crate) u64);
 
@@ -81,22 +81,6 @@ impl Bitboard {
     #[inline(always)]
     pub const fn new(bits: u64) -> Self {
         Self(bits)
-    }
-
-    /// Constructs a new [`Bitboard`] from the provided index.
-    ///
-    /// The resulting [`Bitboard`] will have only a single bit toggled on.
-    ///
-    /// # Example
-    /// ```
-    /// # use chessie_types::Bitboard;
-    /// let board = Bitboard::from_index(63);
-    /// assert_eq!(board.to_hex_string(), "0x8000000000000000");
-    /// ```
-    #[inline(always)]
-    pub const fn from_index(index: usize) -> Self {
-        debug_assert!(index < 64, "Index must be between [0,64)");
-        Self::from_square(Square::from_index_unchecked(index))
     }
 
     /// Constructs a new [`Bitboard`] from the provided [`Square`].
@@ -173,11 +157,7 @@ impl Bitboard {
     where
         Self: From<T>,
     {
-        if let Some(t) = value {
-            Self::from(t)
-        } else {
-            Self::default()
-        }
+        value.map(Self::from).unwrap_or_default()
     }
 
     /// Returns a [`Bitboard`] of this [`Color`]'s first rank.
@@ -264,7 +244,7 @@ impl Bitboard {
     /// # Example
     /// ```
     /// # use chessie_types::{Bitboard, Square};
-    /// let board = Bitboard::from_index(14);
+    /// let board = Bitboard::from_square(Square::G2);
     /// assert_eq!(board.to_square_unchecked(), Square::G2);
     /// ```
     #[inline(always)]
@@ -280,7 +260,7 @@ impl Bitboard {
     /// # Example
     /// ```
     /// # use chessie_types::{Bitboard, Square};
-    /// let board = Bitboard::from_index(14);
+    /// let board = Bitboard::from_square(Square::G2);
     /// assert_eq!(board.to_square(), Some(Square::G2));
     /// let invalid = Bitboard::RANK_1;
     /// assert_eq!(invalid.to_square(), None);
@@ -298,8 +278,8 @@ impl Bitboard {
     ///
     /// # Example
     /// ```
-    /// # use chessie_types::{Bitboard, Rank};
-    /// let board = Bitboard::from_rank(Rank::SEVEN);
+    /// # use chessie_types::Bitboard;
+    /// let board = Bitboard::RANK_7;
     /// assert_eq!(board.to_hex_string(), "0x00FF000000000000");
     ///
     /// let flipped = board.flipped();
@@ -329,7 +309,7 @@ impl Bitboard {
         }
     }
 
-    /// Checks if this [`Bitboard`] is empty, or all zeros.
+    /// Checks if this [`Bitboard`] is empty, meaning all bits are set to `0`.
     ///
     /// # Example
     /// ```
@@ -342,7 +322,7 @@ impl Bitboard {
         self.0 == 0
     }
 
-    /// Checks if this [`Bitboard`] is NOT empty, or contains at least one `1`.
+    /// Checks if this [`Bitboard`] is NOT empty, or contains at least one set bit.
     ///
     /// # Example
     /// ```
@@ -355,35 +335,81 @@ impl Bitboard {
         self.0 != 0
     }
 
-    /// Checks if this [`Bitboard`] contains any of the bits within `other`.
+    /// Returns `true` if `self` contains *every* bit set in `other`.
     ///
     /// # Example
     /// ```
-    /// # use chessie_types::Bitboard;
+    /// # use chessie_types::{Bitboard, Square};
+    /// // Works on single squares
+    /// let e4 = Bitboard::from_square(Square::E4);
+    /// assert!(e4.is_superset(Square::E4));
+    ///
+    /// // ...multiple squares
+    /// assert!(Bitboard::FULL_BOARD.is_superset(Bitboard::CORNERS));
+    ///
+    /// // ...and overlaps
     /// let rank_1 = Bitboard::RANK_1;
     /// let rank_5 = Bitboard::RANK_5;
-    /// let file_a = Bitboard::FILE_A;
-    /// assert_eq!(rank_1.contains(&file_a), true);
-    /// assert_eq!(rank_1.contains(&rank_5), false);
+    /// assert!(rank_1.is_superset(Square::E1));
+    /// assert!(!rank_1.is_superset(rank_5));
     /// ```
     #[inline(always)]
-    pub const fn contains(&self, other: &Self) -> bool {
-        self.0 & other.0 != 0
+    pub fn is_superset(&self, other: impl Into<Self>) -> bool {
+        let other = other.into();
+        (*self & other) == other
     }
 
-    /*
-    /// Returns `true` if `self` contains every bit set in `other`.
-    pub const fn contains_all(&self, other: &Self) -> bool {
-        self.0 & other.0 == other.0
+    /// Returns `true` if `other` contains *every* bit set in `self`.
+    ///
+    /// Wrapper for `other.is_superset(self)`, since those are logically equivalent statements.
+    #[inline(always)]
+    pub fn is_subset(&self, other: impl Into<Self>) -> bool {
+        other.into().is_superset(*self)
     }
 
-    /// Returns `true` if `self` contains none bits set in `other`.
-    pub const fn contains_none(&self, other: &Self) -> bool {
-        self.0 & other.0 != 0
+    /// Returns `true` if `self` contains none of the bits set in `other`.
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie_types::{Bitboard, Square};
+    /// // Works on single squares
+    /// let e4 = Bitboard::from_square(Square::E4);
+    /// assert!(e4.is_disjoint(Square::A1));
+    ///
+    /// // ...multiple squares
+    /// assert!(Bitboard::EDGES.is_disjoint(Bitboard::CENTER));
+    ///
+    /// // ...and overlaps
+    /// assert!(Bitboard::RANK_1.is_disjoint(Bitboard::RANK_5));
+    /// assert!(!Bitboard::RANK_1.is_disjoint(Square::A1));
+    /// ```
+    #[inline(always)]
+    pub fn is_disjoint(&self, other: impl Into<Self>) -> bool {
+        (*self & other.into()).is_empty()
     }
-     */
 
-    /// Toggles the bit corresponding to the location of the provided [`Square`] to `1` (on).
+    /// Returns `true` if `self` contains *any* of the bits set in `other`.
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie_types::{Bitboard, Square};
+    /// // Works on single squares
+    /// let e4 = Bitboard::from_square(Square::E4);
+    /// assert!(e4.intersects(Square::E4));
+    ///
+    /// // ...multiple squares
+    /// assert!(Bitboard::FILE_A.intersects(Square::A3));
+    ///
+    /// // ...and overlaps
+    /// assert!(Bitboard::RANK_1.intersects(Bitboard::FILE_A));
+    /// assert!(!Bitboard::RANK_1.intersects(Bitboard::RANK_5));
+    /// ```
+    #[inline(always)]
+    pub fn intersects(&self, other: impl Into<Self>) -> bool {
+        (*self & other.into()).is_nonempty()
+    }
+
+    /// Sets the bit(s) at the location(s) specified by `other` to `1` (on).
     ///
     /// # Example
     /// ```
@@ -393,24 +419,28 @@ impl Bitboard {
     /// assert_eq!(board.to_hex_string(), "0x0000000000004000");
     /// ```
     #[inline(always)]
-    pub fn set(&mut self, square: Square) {
-        self.set_index(square.index());
+    pub fn set(&mut self, other: impl Into<Self>) {
+        *self |= other.into()
     }
 
-    /// Gets the value of the bit corresponding to the location of the provided [`Square`].
+    /// Toggles (inverts/negates) the bit(s) at the location(s) specified by `other`.
     ///
     /// # Example
     /// ```
     /// # use chessie_types::{Bitboard, Square};
-    /// let board = Bitboard::FILE_A;
-    /// assert!(board.get(Square::A3));
+    /// let mut board = Bitboard::RANK_1;
+    /// assert_eq!(board.to_hex_string(), "0x00000000000000FF");
+    /// board.toggle(Square::C1);
+    /// assert_eq!(board.to_hex_string(), "0x00000000000000FB");
+    /// board.toggle(Square::C1);
+    /// assert_eq!(board.to_hex_string(), "0x00000000000000FF");
     /// ```
     #[inline(always)]
-    pub const fn get(&self, square: Square) -> bool {
-        self.get_index(square.index())
+    pub fn toggle(&mut self, other: impl Into<Self>) {
+        *self ^= other.into()
     }
 
-    /// Toggles the bit corresponding to the location of the provided [`Square`] to `0` (off).
+    /// Clears the bit(s) at the location(s) specified by `other` to `0` (off).
     ///
     /// # Example
     /// ```
@@ -420,14 +450,8 @@ impl Bitboard {
     /// assert_eq!(board.to_hex_string(), "0x00000000000000FB");
     /// ```
     #[inline(always)]
-    pub fn clear(&mut self, square: Square) {
-        self.clear_index(square.index())
-    }
-
-    /// Remove all squares from `other` in `self`
-    #[inline(always)]
-    pub fn remove(&mut self, other: &Self) {
-        self.0 &= !other.0
+    pub fn clear(&mut self, other: impl Into<Self>) {
+        *self &= !other.into()
     }
 
     /// Returns the index of the lowest non-zero bit of this [`Bitboard`], as a [`Square`].
@@ -461,50 +485,6 @@ impl Bitboard {
     #[inline(always)]
     pub fn clear_lsb(&mut self) {
         self.0 &= self.0.wrapping_sub(1);
-    }
-
-    /// Toggles the bit corresponding to the specified [`Square`].
-    #[inline(always)]
-    pub fn toggle_square(&mut self, square: Square) {
-        *self ^= Self::from_square(square);
-    }
-
-    /// Toggles the bit at `index`.
-    #[inline(always)]
-    pub fn toggle_index(&mut self, index: usize) {
-        *self ^= Self::from_index(index);
-    }
-
-    /// Sets the bit at `index` to `1`.
-    ///
-    /// # Panics
-    /// If `index > 63` with debug assertions enabled.
-    #[inline(always)]
-    fn set_index(&mut self, index: usize) {
-        debug_assert!(index < 64, "Index must be between [0,64)");
-        // self.0 |= 1 << index;
-        *self |= Self::from_index(index);
-    }
-
-    /// Returns `true` if the bit at `index` is set, else `false`.
-    ///
-    /// # Panics
-    /// If `index > 63` with debug assertions enabled.
-    #[inline(always)]
-    const fn get_index(&self, index: usize) -> bool {
-        debug_assert!(index < 64, "Index must be between [0,64)");
-        (self.0 & 1 << index) != 0
-    }
-
-    /// Sets the bit at `index` to `0`.
-    ///
-    /// # Panics
-    /// If `index > 63` with debug assertions enabled.
-    #[inline(always)]
-    fn clear_index(&mut self, index: usize) {
-        debug_assert!(index < 64, "Index must be between [0,64)");
-        // self.0 ^= 1 << index;
-        *self ^= Self::from_index(index);
     }
 
     /// Returns a [`BitboardIter`] to iterate over all of the set bits as [`Square`]s.
@@ -548,13 +528,13 @@ impl Bitboard {
     /// ```
     /// # use chessie_types::{Bitboard, Color};
     /// let rank4 = Bitboard::RANK_4;
-    /// assert_eq!(rank4.advance_by(Color::White, 1), Bitboard::RANK_5);
-    /// assert_eq!(rank4.advance_by(Color::Black, 1), Bitboard::RANK_3);
+    /// assert_eq!(rank4.forward_by(Color::White, 1), Bitboard::RANK_5);
+    /// assert_eq!(rank4.forward_by(Color::Black, 1), Bitboard::RANK_3);
     /// // Wrapping
-    /// assert_eq!(rank4.advance_by(Color::White, 5), Bitboard::RANK_1);
+    /// assert_eq!(rank4.forward_by(Color::White, 5), Bitboard::RANK_1);
     /// ```
     #[inline(always)]
-    pub const fn advance_by(self, color: Color, n: u32) -> Self {
+    pub const fn forward_by(self, color: Color, n: u32) -> Self {
         // Black magic: If `color` is White, this rotates left by 8, which is the same as "n ranks up"
         // If `color` is Black, this rotates left by 496, which is the same as rotating right by 8, or "n ranks down"
         Self(self.0.rotate_left(n * 8 * (1 + color as u32 * 62)))
@@ -570,13 +550,13 @@ impl Bitboard {
     /// ```
     /// # use chessie_types::{Bitboard, Color};
     /// let rank4 = Bitboard::RANK_4;
-    /// assert_eq!(rank4.retreat_by(Color::White, 1), Bitboard::RANK_3);
-    /// assert_eq!(rank4.retreat_by(Color::Black, 1), Bitboard::RANK_5);
+    /// assert_eq!(rank4.backward_by(Color::White, 1), Bitboard::RANK_3);
+    /// assert_eq!(rank4.backward_by(Color::Black, 1), Bitboard::RANK_5);
     /// // Wrapping
-    /// assert_eq!(rank4.retreat_by(Color::Black, 5), Bitboard::RANK_1);
+    /// assert_eq!(rank4.backward_by(Color::Black, 5), Bitboard::RANK_1);
     /// ```
     #[inline(always)]
-    pub const fn retreat_by(self, color: Color, n: u32) -> Self {
+    pub const fn backward_by(self, color: Color, n: u32) -> Self {
         // Black magic: If `color` is White, this rotates right by 8, which is the same as "n ranks down"
         // If `color` is Black, this rotates right by 496, which is the same as rotating left by 8, or "n ranks up"
         Self(self.0.rotate_right(n * 8 * (1 + color as u32 * 62)))
@@ -743,6 +723,7 @@ impl Bitboard {
     }
 
     /// Formats this [`Bitboard`] as a hexadecimal string.
+    #[inline(always)]
     pub fn to_hex_string(&self) -> String {
         format!("0x{:0>16X}", self.0)
     }
@@ -869,28 +850,13 @@ impl Shr<Rank> for Bitboard {
     }
 }
 
-impl Index<Square> for Bitboard {
+impl<T: Into<Bitboard>> Index<T> for Bitboard {
     type Output = bool;
-    /// A [`Bitboard`] can be indexed by a [`Square`] to yield `true` or `false`, if the bit at that index is set.
-    #[inline(always)]
-    fn index(&self, index: Square) -> &Self::Output {
-        if self.get_index(index.index()) {
-            &true
-        } else {
-            &false
-        }
-    }
-}
 
-impl Index<usize> for Bitboard {
-    type Output = bool;
-    /// A [`Bitboard`] can be indexed by a [`usize`] to yield `true` or `false`, if the bit at that index is set.
-    ///
-    /// # Panics
-    /// If debug assertions are enabled and `index > 63`.
+    /// Wrapper over [`Bitboard::get`].
     #[inline(always)]
-    fn index(&self, index: usize) -> &Self::Output {
-        if self.get_index(index) {
+    fn index(&self, index: T) -> &Self::Output {
+        if self.intersects(index) {
             &true
         } else {
             &false
@@ -965,6 +931,13 @@ impl fmt::Binary for Bitboard {
     }
 }
 
+impl Default for Bitboard {
+    #[inline(always)]
+    fn default() -> Self {
+        Self::EMPTY_BOARD
+    }
+}
+
 impl fmt::Display for Bitboard {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Allocate just enough capacity
@@ -973,7 +946,7 @@ impl fmt::Display for Bitboard {
         for rank in Rank::iter().rev() {
             for file in File::iter() {
                 let square = Square::new(file, rank);
-                let occupant = if self.get(square) { 'X' } else { '.' };
+                let occupant = if self.intersects(square) { 'X' } else { '.' };
 
                 board += &format!("{occupant} ");
             }
@@ -994,7 +967,7 @@ impl fmt::Debug for Bitboard {
 
             for file in File::iter() {
                 let square = Square::new(file, rank);
-                let occupant = if self.get(square) { 'X' } else { '.' };
+                let occupant = if self.intersects(square) { 'X' } else { '.' };
 
                 board += &format!("{occupant} ");
             }

@@ -227,9 +227,9 @@ fn generate_pawn_pushes(color: Color) -> [Bitboard; 64] {
         let bb = Bitboard::from_square(square);
 
         if square.rank() == Rank::second(color) {
-            boards[square] = bb.advance_by(color, 1) | bb.advance_by(color, 2);
+            boards[square] = bb.forward_by(color, 1) | bb.forward_by(color, 2);
         } else {
-            boards[square] = bb.advance_by(color, 1);
+            boards[square] = bb.forward_by(color, 1);
         }
     }
     boards
@@ -243,7 +243,7 @@ fn generate_pawn_attacks(color: Color) -> [Bitboard; 64] {
     for square in Square::iter() {
         let bb = Bitboard::from_square(square);
 
-        boards[square] = bb.advance_by(color, 1).east() | bb.advance_by(color, 1).west();
+        boards[square] = bb.forward_by(color, 1).east() | bb.forward_by(color, 1).west();
     }
     boards
 }
@@ -445,7 +445,7 @@ fn compute_blocked_attacks(deltas: &[(i8, i8)], square: Square, blockers: Bitboa
         let mut ray = square;
 
         // Loop until we encounter the first occupied square
-        while !blockers.get(ray) {
+        while !blockers.intersects(ray) {
             // If we have not moved off the edge of the board, add this square to the attack bitboard
             if let Some(shifted) = ray.offset(*df, *dr) {
                 ray = shifted;

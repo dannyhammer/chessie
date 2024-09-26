@@ -420,12 +420,9 @@ impl Position {
         self.key.hash_piece(from, piece);
 
         // Clear the EP square from the last move (and un-hash it)
-        self.key.hash_optional_ep_square(self.ep_square.take());
-
-        // Take away and un-hash the castling rights
-        let mut rights = self.castling_rights;
-        self.key.hash_castling_rights(&rights);
-        // self.key.hash_castling_rights(rights, color);
+        if let Some(ep_square) = self.ep_square.take() {
+            self.key.hash_ep_square(ep_square);
+        }
 
         // Increment move counters
         self.halfmove += 1; // This is reset if a capture occurs or a pawn moves
@@ -448,10 +445,16 @@ impl Position {
             // If the capture was on a rook's starting square, disable that side's castling.
             if to.rank() == Rank::first(captured_color) {
                 // Either a rook was captured, or there wasn't a rook there, in which case castling on that side is already disabled
-                if rights[captured_color].long.is_some_and(|f| to.file() == f) {
-                    rights[captured_color].long.take();
-                } else if rights[captured_color].short.is_some_and(|f| to.file() == f) {
-                    rights[captured_color].short.take();
+                if self.castling_rights[captured_color]
+                    .long
+                    .is_some_and(|file| to.file() == file)
+                {
+                    self.clear_long_castling_rights(captured_color);
+                } else if self.castling_rights[captured_color]
+                    .short
+                    .is_some_and(|file| to.file() == file)
+                {
+                    self.clear_short_castling_rights(captured_color);
                 }
             }
 
@@ -472,26 +475,32 @@ impl Position {
             self.board_mut().place(rook, new_rook_square);
 
             // Disable castling
-            rights[color].short = None;
-            rights[color].long = None;
+            self.clear_castling_rights(color);
         }
 
         // Next, handle special cases for Pawn (halfmove), Rook, and King (castling)
         match piece.kind() {
             PieceKind::Pawn => self.halfmove = 0,
+
             PieceKind::Rook => {
                 // Disable castling if a rook moved
-                if from == Square::A1.rank_relative_to(color) {
-                    rights[color].long.take();
-                } else if from == Square::H1.rank_relative_to(color) {
-                    rights[color].short.take();
+                if from.rank() == Rank::first(color) {
+                    if self.castling_rights[color]
+                        .long
+                        .is_some_and(|file| from.file() == file)
+                    {
+                        self.clear_long_castling_rights(color);
+                    } else if self.castling_rights[color]
+                        .short
+                        .is_some_and(|file| from.file() == file)
+                    {
+                        self.clear_short_castling_rights(color);
+                    }
                 }
             }
-            PieceKind::King => {
-                // Disable all castling
-                rights[color].short = None;
-                rights[color].long = None;
-            }
+
+            PieceKind::King => self.clear_castling_rights(color),
+
             _ => {}
         }
 
@@ -499,10 +508,6 @@ impl Position {
         if let Some(promotion) = mv.promotion() {
             piece = piece.promoted(promotion);
         }
-
-        // Re-set and re-hash the castling rights
-        self.key.hash_castling_rights(&rights);
-        self.castling_rights = rights;
 
         // Place the piece in it's new position
         self.board_mut().place(piece, to);
@@ -515,6 +520,31 @@ impl Position {
 
         // Toggle the hash of the current player
         self.key.hash_side_to_move(self.side_to_move());
+    }
+
+    /// Clears the castling rights of `color`
+    #[inline(always)]
+    fn clear_castling_rights(&mut self, color: Color) {
+        self.key.hash_castling_rights(&self.castling_rights);
+        self.castling_rights[color].short = None;
+        self.castling_rights[color].long = None;
+        self.key.hash_castling_rights(&self.castling_rights);
+    }
+
+    /// Clears the short/kingside castling rights of `color`
+    #[inline(always)]
+    fn clear_short_castling_rights(&mut self, color: Color) {
+        self.key.hash_castling_rights(&self.castling_rights);
+        self.castling_rights[color].short = None;
+        self.key.hash_castling_rights(&self.castling_rights);
+    }
+
+    /// Clears the long/queenside castling rights of `color`
+    #[inline(always)]
+    fn clear_long_castling_rights(&mut self, color: Color) {
+        self.key.hash_castling_rights(&self.castling_rights);
+        self.castling_rights[color].long = None;
+        self.key.hash_castling_rights(&self.castling_rights);
     }
 }
 
@@ -552,48 +582,45 @@ impl fmt::Debug for Position {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let ranks = Rank::iter().rev();
 
-        let mut board_str = String::with_capacity(10);
         for rank in ranks {
-            board_str += &format!("{rank}|");
+            write!(f, "{rank}")?;
+            write!(f, "|")?;
             for file in File::iter() {
                 let piece = self.board().piece_at(file * rank);
                 let piece_char = piece.map(|p| p.char()).unwrap_or('.');
-                board_str += &format!(" {piece_char}");
+                write!(f, " {piece_char}")?;
             }
 
-            /*
             if rank == Rank::SEVEN {
-                board_str += &format!("           FEN: {}", self.to_fen());
+                write!(f, "           FEN: {}", self.to_fen())?;
             } else if rank == Rank::SIX {
-                board_str += &format!("          Side: {}", self.side_to_move());
+                write!(f, "          Side: {}", self.side_to_move())?;
             } else if rank == Rank::FIVE {
-                // board_str += &format!("      Castling: {}", self.castling_rights());
-                let rights = format!("{}", self.castling_rights_for(Color::White));
-                board_str += &format!("      Castling: {}", rights);
+                write!(f, "      Castling: {}", self.castling_rights_uci())?;
             } else if rank == Rank::FOUR {
                 let ep = self
                     .ep_square()
                     .map(|t| t.to_uci())
                     .unwrap_or(String::from("-"));
-                board_str += &format!("            EP: {ep}",);
+                write!(f, "            EP: {ep}")?;
             } else if rank == Rank::THREE {
-                board_str += &format!("     Half-move: {}", self.halfmove());
+                write!(f, "     Half-move: {}", self.halfmove())?;
             } else if rank == Rank::TWO {
-                board_str += &format!("     Full-move: {}", self.fullmove());
+                write!(f, "     Full-move: {}", self.fullmove())?;
             }
-            board_str += "\n";
-             */
+            writeln!(f)?;
         }
-        board_str += " +";
+        write!(f, " +")?;
         for _ in File::iter() {
-            board_str += "--";
+            write!(f, "--")?;
         }
-        board_str += "\n   ";
+        write!(f, "\n   ")?;
         for file in File::iter() {
-            board_str += &format!("{file} ");
+            write!(f, "{file}")?;
+            write!(f, " ")?;
         }
 
-        write!(f, "{board_str}")
+        Ok(())
     }
 }
 
