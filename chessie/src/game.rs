@@ -12,12 +12,10 @@ use std::{
 
 use anyhow::Result;
 
-use crate::{bishop_rays, rook_rays};
-
 use super::{
-    bishop_attacks, compute_attacks_by, king_attacks, knight_attacks, pawn_attacks, pawn_pushes,
-    queen_attacks, ray_between, ray_containing, rook_attacks, Bitboard, Color, Move, MoveGenIter,
-    MoveKind, MoveList, Piece, PieceKind, Position, Rank, Square,
+    bishop_attacks, bishop_rays, compute_attacks_by, king_attacks, knight_attacks, pawn_attacks,
+    pawn_pushes, queen_attacks, ray_between, ray_containing, rook_attacks, rook_rays, Bitboard,
+    Color, File, Move, MoveGenIter, MoveKind, MoveList, Piece, PieceKind, Position, Rank, Square,
 };
 
 /// A game of chess.
@@ -130,7 +128,26 @@ impl Game {
     }
      */
 
+    /// Toggles the side to move of the current position.
+    ///
+    /// This is equivalent to playing a nullmove.
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie::*;
+    /// let mut game = Game::default();
+    /// assert_eq!(game.to_fen(), "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    /// game.toggle_side_to_move();
+    /// assert_eq!(game.to_fen(), "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1");
+    /// ```
+    #[inline(always)]
+    pub fn toggle_side_to_move(&mut self) {
+        self.position.toggle_side_to_move();
+        self.recompute_legal_masks();
+    }
+
     /// Applies the move, if it is legal to make. If it is not legal, returns an `Err` explaining why.
+    #[inline(always)]
     pub fn make_move_checked(&mut self, mv: Move) -> Result<()> {
         self.check_pseudo_legality_of(mv)?;
         self.make_move(mv);
@@ -190,6 +207,16 @@ impl Game {
         }
     }
 
+    /// Converts the provided string to a [`Move`], if possible, and applies it to the game.
+    ///
+    /// Equivalent to calling [`Move::from_uci`] and [`Game::make_move`].
+    #[inline(always)]
+    pub fn make_move_uci(&mut self, mv_str: &str) -> Result<()> {
+        let mv = Move::from_uci(self, mv_str)?;
+        self.make_move(mv);
+        Ok(())
+    }
+
     /// Applies the provided [`Move`]. No enforcement of legality.
     #[inline(always)]
     pub fn make_move(&mut self, mv: Move) {
@@ -218,6 +245,12 @@ impl Game {
     #[inline(always)]
     pub const fn checkers(&self) -> Bitboard {
         self.checkers
+    }
+
+    /// Fetch a [`Bitboard`] of all squares occupied by pinned pieces.
+    #[inline(always)]
+    pub const fn pinned(&self) -> Bitboard {
+        self.pinned
     }
 
     // TODO: Needs testing
@@ -811,7 +844,49 @@ impl<'a> IntoIterator for &'a mut Game {
 
 impl fmt::Display for Game {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.position().fmt(f)
+        let ranks = Rank::iter().rev();
+
+        let squares_to_string = |bb: Bitboard| {
+            bb.into_iter()
+                .map(Square::to_uci)
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+
+        for rank in ranks {
+            write!(f, "{rank}")?;
+            write!(f, "|")?;
+            for file in File::iter() {
+                let piece = self.board().piece_at(file * rank);
+                let piece_char = piece.map(|p| p.char()).unwrap_or('.');
+                write!(f, " {piece_char}")?;
+            }
+
+            if rank == Rank::SEVEN {
+                write!(f, "           FEN: {}", self.to_fen())?;
+            } else if rank == Rank::SIX {
+                write!(f, "           Key: {}", self.key())?;
+            } else if rank == Rank::FIVE {
+                write!(f, "      Checkers: {}", squares_to_string(self.checkers()))?;
+            } else if rank == Rank::FOUR {
+                write!(f, "        Pinned: {}", squares_to_string(self.pinned()))?;
+                // } else if rank == Rank::THREE {
+                // } else if rank == Rank::TWO {
+                // } else if rank == Rank::ONE {
+            }
+            writeln!(f)?;
+        }
+        write!(f, " +")?;
+        for _ in File::iter() {
+            write!(f, "--")?;
+        }
+        write!(f, "\n   ")?;
+        for file in File::iter() {
+            write!(f, "{file}")?;
+            write!(f, " ")?;
+        }
+
+        Ok(())
     }
 }
 

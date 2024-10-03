@@ -238,6 +238,8 @@ impl Move {
 
     /// Creates an "illegal" [`Move`], representing moving a piece to and from the same [`Square`].
     ///
+    /// Playing this move on a [`Position`] is *not* the same as playing a [null move](https://www.chessprogramming.org/Null_Move).
+    ///
     /// # Example
     /// ```
     /// # use chessie::Move;

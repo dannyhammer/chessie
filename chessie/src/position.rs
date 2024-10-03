@@ -134,9 +134,9 @@ impl Position {
     pub fn from_fen(fen: &str) -> Result<Self> {
         let mut pos = Self::new();
         let mut split = fen.trim().split(' ');
-        let placements = split.next().ok_or(anyhow!(
-            "Invalid FEN string: FEN string must have piece placements."
-        ))?;
+        let placements = split
+            .next()
+            .ok_or(anyhow!("FEN string must have piece placements."))?;
         pos.board = Board::from_fen(placements)?;
 
         let active_color = split.next().unwrap_or("w");
@@ -178,12 +178,12 @@ impl Position {
 
         let halfmove = split.next().unwrap_or("0");
         pos.halfmove = halfmove.parse().or(Err(anyhow!(
-            "Invalid FEN string: FEN string must have valid halfmove counter. Got {halfmove}"
+            "FEN string must have valid halfmove counter. Got {halfmove:?}"
         )))?;
 
         let fullmove = split.next().unwrap_or("1");
         pos.fullmove = fullmove.parse().or(Err(anyhow!(
-            "Invalid FEN string: FEN string must have valid fullmove counter. Got {fullmove}"
+            "FEN string must have valid fullmove counter. Got {fullmove:?}"
         )))?;
 
         pos.key = ZobristKey::new(&pos);
@@ -586,7 +586,8 @@ impl fmt::Debug for Position {
             write!(f, "{rank}")?;
             write!(f, "|")?;
             for file in File::iter() {
-                let piece = self.board().piece_at(file * rank);
+                let square = Square::new(file, rank);
+                let piece = self.board().piece_at(square);
                 let piece_char = piece.map(|p| p.char()).unwrap_or('.');
                 write!(f, " {piece_char}")?;
             }
@@ -607,6 +608,8 @@ impl fmt::Debug for Position {
                 write!(f, "     Half-move: {}", self.halfmove())?;
             } else if rank == Rank::TWO {
                 write!(f, "     Full-move: {}", self.fullmove())?;
+            } else if rank == Rank::ONE {
+                write!(f, "     Key: {}", self.key())?;
             }
             writeln!(f)?;
         }
@@ -672,7 +675,7 @@ impl Board {
 
         // Check if the placements string is the correct length
         if placements.matches('/').count() != 7 {
-            bail!("Missing placements for all 8 ranks.");
+            bail!("FEN must have piece placements for all 8 ranks");
         }
 
         // Need to reverse this so that White pieces are at the "bottom" of the board
@@ -692,7 +695,9 @@ impl Board {
                 } else {
                     // If the next char was not a piece, increment our File counter, checking for errors along the way
                     let Some(empty) = piece_char.to_digit(10) else {
-                        bail!("Found non-piece, non-numeric char {piece_char:?} when parsing FEN.");
+                        bail!(
+                            "FEN placements must contain piece chars or digits. Got {piece_char:?}"
+                        );
                     };
                     file += empty as u8
                 }

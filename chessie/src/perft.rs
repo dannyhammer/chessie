@@ -142,6 +142,37 @@ impl fmt::Display for PerftResult {
 }
  */
 
+/*
+/// Perform a perft at the specified depth, collecting data on captures, castling, promotions, etc.
+pub fn perft_full(position: &Position, depth: usize) -> PerftResult {
+    let mut res = PerftResult::default();
+
+    if depth == 0 {
+        res.nodes = 1;
+        // res.captures = 32 - position.bitboards().occupied().population() as u64; // TODO: Fetch original number of pieces
+        // res.castles = position.times_castled() as u64;
+        // res.checks = position.is_check() as u64;
+        // res.checkmates = position.is_checkmate() as u64;
+        return res;
+    }
+
+    let game = Game::new(position);
+
+    if depth == 1 {
+        res.nodes = game.legal_moves().len() as u64;
+        // TODO: Functions for `num_captures_available()` etc.
+        return res;
+    }
+
+    for mv in game {
+        let new_pos = position.clone().with_move_made(mv);
+        res += perft_full(&new_pos, depth - 1);
+    }
+
+    res
+}
+ */
+
 /// Prints a perft at the specified depth.
 ///
 /// If the generic parameter `SPLIT` is `true`, this will perform a `splitperft`,
@@ -149,7 +180,7 @@ impl fmt::Display for PerftResult {
 /// were reached after each of those moves.
 ///
 /// If the generic parameter `PRETTY` is `true`, additional info will be printed.
-pub fn print_perft<const PRETTY: bool, const SPLIT: bool>(game: &Game, depth: usize) {
+pub fn print_perft<const PRETTY: bool, const SPLIT: bool>(game: &Game, depth: usize) -> u64 {
     if PRETTY {
         println!("Computing PERFT({depth}) of the following position:\n{game}\n",);
     }
@@ -183,38 +214,9 @@ pub fn print_perft<const PRETTY: bool, const SPLIT: bool>(game: &Game, depth: us
     } else {
         println!("{total_nodes}");
     }
+
+    total_nodes
 }
-
-/*
-/// Perform a perft at the specified depth, collecting data on captures, castling, promotions, etc.
-pub fn perft_full(position: &Position, depth: usize) -> PerftResult {
-    let mut res = PerftResult::default();
-
-    if depth == 0 {
-        res.nodes = 1;
-        // res.captures = 32 - position.bitboards().occupied().population() as u64; // TODO: Fetch original number of pieces
-        // res.castles = position.times_castled() as u64;
-        // res.checks = position.is_check() as u64;
-        // res.checkmates = position.is_checkmate() as u64;
-        return res;
-    }
-
-    let game = Game::new(position);
-
-    if depth == 1 {
-        res.nodes = game.legal_moves().len() as u64;
-        // TODO: Functions for `num_captures_available()` etc.
-        return res;
-    }
-
-    for mv in game {
-        let new_pos = position.clone().with_move_made(mv);
-        res += perft_full(&new_pos, depth - 1);
-    }
-
-    res
-}
- */
 
 /// Perform a perft at the specified depth, collecting only data about the number of possible positions (nodes).
 ///
@@ -222,11 +224,26 @@ pub fn perft_full(position: &Position, depth: usize) -> PerftResult {
 /// rather than making them, recursing again, and returning 1 for each terminal case.
 #[inline(always)]
 pub fn perft(game: &Game, depth: usize) -> u64 {
-    perft_generic::<true>(game, depth)
+    // Bulk counting; no need to recurse again just to apply a singular move and return 1.
+    if depth == 1 {
+        return game.get_legal_moves().len() as u64;
+    }
+    // Recursion limit; return 1, since we're fathoming this node.
+    else if depth == 0 {
+        return 1;
+    }
+
+    // Recursively accumulate the nodes from the remaining depths
+    game.get_legal_moves().into_iter().fold(0, |nodes, mv| {
+        nodes + perft(&game.with_move_made(mv), depth - 1)
+    })
 }
 
 /// Generic version of `perft` that allows you to specify whether to perform bulk counting or not.
-pub fn perft_generic<const BULK: bool>(game: &Game, depth: usize) -> u64 {
+pub fn perft_generic<const BULK: bool, const SPLIT: bool, const PRETTY: bool>(
+    game: &Game,
+    depth: usize,
+) -> u64 {
     // Bulk counting; no need to recurse again just to apply a singular move and return 1.
     if BULK && depth == 1 {
         return game.get_legal_moves().len() as u64;
@@ -238,6 +255,6 @@ pub fn perft_generic<const BULK: bool>(game: &Game, depth: usize) -> u64 {
 
     // Recursively accumulate the nodes from the remaining depths
     game.get_legal_moves().into_iter().fold(0, |nodes, mv| {
-        nodes + perft_generic::<BULK>(&game.with_move_made(mv), depth - 1)
+        nodes + perft_generic::<BULK, false, false>(&game.with_move_made(mv), depth - 1)
     })
 }
