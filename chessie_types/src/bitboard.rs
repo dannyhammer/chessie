@@ -769,6 +769,13 @@ impl FromStr for Bitboard {
     }
 }
 
+impl FromIterator<Square> for Bitboard {
+    /// A [`Bitboard`] can be created from an iterator over [`Square`]s.
+    fn from_iter<T: IntoIterator<Item = Square>>(iter: T) -> Self {
+        iter.into_iter().fold(Self::default(), |bb, sq| bb | sq)
+    }
+}
+
 macro_rules! impl_bitwise_op {
     // Impl op and op_assign for Self
     ($op:tt, $op_assign:tt, $func:ident, $func_assign:ident) => {

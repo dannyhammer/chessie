@@ -164,8 +164,9 @@ impl Game {
         self.king_square = self.king(color).to_square_unchecked();
 
         // Reset the pinmask and checkmask
-        self.checkmask = self.enemy_or_empty(color);
         self.pinned = Bitboard::default();
+        // Sanity check; no move can capture the enemy King, so his square is removed
+        self.checkmask = self.enemy_or_empty(color) ^ self.king(opponent);
 
         // Starting off, the easiest checkers to find are Knights and Pawns; just the overlap of their attacks from the King and themselves.
         self.checkers = self.knights(opponent) & knight_attacks(self.king_square)
@@ -198,7 +199,7 @@ impl Game {
         // If there are any checkers, we need to update the checkmask
         if self.checkers.is_nonempty() {
             // Start with the checkers so they are included in the checkmask (since there is no ray between a King and a Knight)
-            self.checkmask = self.checkers;
+            self.checkmask = self.checkers ^ self.king(opponent);
 
             // There is *usually* less than two checkers, so this rarely loops.
             for checker in self.checkers {
@@ -325,6 +326,10 @@ impl Game {
     }
 
     /// Generate all legal moves from the current position that originate from squares in `mask`.
+    ///
+    /// Important note: If you call this method on a position that is in double-check with a
+    /// mask that does _not_ include the King who is in check, no moves will be generated.
+    /// This is intentional behavior, as only the King can move when in double-check.
     ///
     /// # Example
     /// ```
@@ -466,11 +471,10 @@ impl Game {
 
     /// Generates and serializes all legal King moves.
     fn generate_king_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
+        // If the mask doesn't contain the King, then don't generate the King's moves
         if mask.is_disjoint(self.king_square) {
             return;
         }
-
-        // for from in self.king_square & mask {}
 
         let from = self.king_square;
         let color = self.side_to_move();
