@@ -1,1 +1,5 @@
 /target
+
+# I just use these locally to test things, so they shouldn't be tracked.
+chessie/src/main.rs
+chessie_types/src/main.rs
