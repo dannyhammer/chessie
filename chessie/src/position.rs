@@ -143,31 +143,24 @@ impl Position {
         pos.side_to_move = Color::from_str(active_color)?;
 
         // Castling is a bit more complicated; especially for Chess960
-        let castling = split.next().unwrap_or("KQkq");
+        let castling = split.next().unwrap_or("-");
         if castling.contains(['K', 'k', 'Q', 'q']) {
             pos.castling_rights[Color::White].short = castling.contains('K').then_some(File::H);
             pos.castling_rights[Color::White].long = castling.contains('Q').then_some(File::A);
             pos.castling_rights[Color::Black].short = castling.contains('k').then_some(File::H);
             pos.castling_rights[Color::Black].long = castling.contains('q').then_some(File::A);
         } else if castling.chars().any(|c| File::from_char(c).is_ok()) {
-            eprintln!("Warning: Chess960 FEN detected for castling rights: {castling:?}");
-            eprintln!("Chess960 is not currently supported");
-            /*
-            // TODO: Support Chess960
-            for c in uci.chars() {
+            for c in castling.chars() {
                 let color = Color::from_bool(c.is_ascii_lowercase());
-                let file = File::from_char(c)?;
-                let rank = Rank::first(color);
-                let rook_square = Square::new(file, rank);
+                let rook_file = File::from_char(c)?;
 
-                let king_file = File::E; // TODO: Fetch King's file the rest of the FEN
-                if file > king_file {
-                    short[color] = Some(rook_square);
+                let king_file = pos.board.king(color).to_square_unchecked().file();
+                if rook_file > king_file {
+                    pos.castling_rights[color].short = Some(rook_file);
                 } else {
-                    long[color] = Some(rook_square);
+                    pos.castling_rights[color].long = Some(rook_file);
                 }
             }
-             */
         }
 
         let en_passant_target = split.next().unwrap_or("-");
@@ -200,22 +193,27 @@ impl Position {
     }
 
     /// Generates a FEN string from this [`Position`].
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie::Position;
+    /// let state = Position::default();
+    /// assert_eq!(state.to_fen(), "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    /// ```
     pub fn to_fen(&self) -> String {
-        let placements = self.board().to_fen();
-        let active_color = self.side_to_move();
+        format!("{self}")
+    }
 
-        let castling = self.castling_rights_uci();
-
-        let en_passant_target = if let Some(square) = self.ep_square {
-            square.to_string()
-        } else {
-            String::from("-")
-        };
-
-        let halfmove = self.halfmove;
-        let fullmove = self.fullmove;
-
-        format!("{placements} {active_color} {castling} {en_passant_target} {halfmove} {fullmove}")
+    /// Generates a FEN string from this [`Position`] with castling rights in Chess960 format.
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie::Position;
+    /// let state = Position::default();
+    /// assert_eq!(state.to_960_fen(), "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w HAha - 0 1");
+    /// ```
+    pub fn to_960_fen(&self) -> String {
+        format!("{self:#}")
     }
 
     /// Returns the current player as a [`Color`].
@@ -249,9 +247,8 @@ impl Position {
         &self.castling_rights[color.index()]
     }
 
-    /// Returns the [`CastlingRights`] of the current position.
+    /// Returns the [`CastlingRights`] of the current position in standard UCI notation.
     pub fn castling_rights_uci(&self) -> String {
-        // Castling rights done individually
         let mut castling = String::with_capacity(4);
 
         if self.castling_rights()[Color::White].short.is_some() {
@@ -265,6 +262,33 @@ impl Position {
         }
         if self.castling_rights()[Color::Black].long.is_some() {
             castling.push('q');
+        }
+
+        // If no side can castle, use a hyphen
+        if castling.is_empty() {
+            castling = String::from("-");
+        }
+        castling
+    }
+
+    /// Returns the [`CastlingRights`] of the current position in Chess960 notation.
+    pub fn castling_rights_960(&self) -> String {
+        let mut castling = String::with_capacity(4);
+
+        if let Some(file) = self.castling_rights()[Color::White].short {
+            castling.push(file.char().to_ascii_uppercase());
+        }
+
+        if let Some(file) = self.castling_rights()[Color::White].long {
+            castling.push(file.char().to_ascii_uppercase());
+        }
+
+        if let Some(file) = self.castling_rights()[Color::Black].short {
+            castling.push(file.char());
+        }
+
+        if let Some(file) = self.castling_rights()[Color::Black].long {
+            castling.push(file.char());
         }
 
         // If no side can castle, use a hyphen
@@ -572,9 +596,32 @@ impl Default for Position {
 }
 
 impl fmt::Display for Position {
-    /// Display this position's FEN string
+    /// Display this position's FEN string.
+    ///
+    /// If the alternate format mode (`#`) was specified, this will print the castling rights in Chess960 format.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_fen())
+        let placements = self.board().to_fen();
+        let active_color = self.side_to_move();
+
+        let castling = if f.alternate() {
+            self.castling_rights_960()
+        } else {
+            self.castling_rights_uci()
+        };
+
+        let en_passant_target = if let Some(square) = self.ep_square {
+            square.to_string()
+        } else {
+            String::from("-")
+        };
+
+        let halfmove = self.halfmove;
+        let fullmove = self.fullmove;
+
+        write!(
+            f,
+            "{placements} {active_color} {castling} {en_passant_target} {halfmove} {fullmove}"
+        )
     }
 }
 

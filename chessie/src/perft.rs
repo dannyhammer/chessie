@@ -191,7 +191,7 @@ pub fn print_perft<const PRETTY: bool, const SPLIT: bool>(game: &Game, depth: us
         for mv in game.get_legal_moves() {
             let nodes = perft(&game.with_move_made(mv), depth - 1);
 
-            println!("{mv}\t{nodes}");
+            println!("{mv:#}\t{nodes}");
             total_nodes += nodes;
         }
         println!(); // Empty line between last splitperft and total_nodes

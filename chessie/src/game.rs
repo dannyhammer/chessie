@@ -278,7 +278,6 @@ impl Game {
 
         // If it's a castle, we need to move the Rook
         if mv.is_castle() {
-            // TODO: Chess960
             let castle_index = mv.is_short_castle() as usize;
             let old_rook_square = [Square::A1, Square::H1][castle_index].rank_relative_to(color);
             let new_rook_square = [Square::D1, Square::F1][castle_index].rank_relative_to(color);
@@ -479,16 +478,27 @@ impl Game {
         let from = self.king_square;
         let color = self.side_to_move();
         for to in self.generate_legal_king_mobility::<IN_CHECK>(color, from) {
-            let mut kind = if self.has(to) {
+            let victim = self.piece_at(to);
+            let mut kind = if victim.is_some() {
                 MoveKind::Capture
             } else {
                 MoveKind::Quiet
             };
 
-            if from == Square::E1.rank_relative_to(color) {
-                if to == Square::G1.rank_relative_to(color) {
+            // if from == Square::E1.rank_relative_to(color) {
+            //     if to == Square::G1.rank_relative_to(color) {
+            //         kind = MoveKind::ShortCastle;
+            //     } else if to == Square::C1.rank_relative_to(color) {
+            //         kind = MoveKind::LongCastle;
+            //     }
+            // }
+
+            // If this move "captures" our own Rook, it is castling
+            if victim.is_some_and(|p| p.is_rook() && p.color() == color) {
+                // Determine which side of castling this is
+                if to.file() > from.file() {
                     kind = MoveKind::ShortCastle;
-                } else if to == Square::C1.rank_relative_to(color) {
+                } else {
                     kind = MoveKind::LongCastle;
                 }
             }
@@ -740,13 +750,21 @@ impl Game {
             short.unwrap_or_default() | long.unwrap_or_default()
         };
 
+        eprintln!("CASTLING:\n{castling:?}");
+
         let discoverable_checks = self.generate_discoverable_checks_bitboard(color);
 
         // Safe squares are ones not attacked by the enemy or part of a discoverable check
         let safe_squares = !(enemy_attacks | discoverable_checks);
 
         // All legal attacks that are safe and not on friendly squares
-        (attacks | castling) & safe_squares & self.enemy_or_empty(color)
+        // (attacks | castling) & safe_squares & self.enemy_or_empty(color)
+        // ((attacks & self.enemy_or_empty(color))
+        //     | (castling & self.piece_parts(color, PieceKind::Rook)))
+        //     & safe_squares
+
+        (attacks & self.enemy_or_empty(color) & safe_squares)
+            | (castling & self.piece_parts(color, PieceKind::Rook))
     }
 
     /// Generate a bitboard for `color`'s ability to castle with the Rook on `rook_square`, which will place the King on `dst_square`.
@@ -761,11 +779,12 @@ impl Game {
         let squares_that_must_be_empty = ray_between(self.king_square, rook_square);
         let squares_are_empty = (squares_that_must_be_empty & blockers).is_empty();
 
-        // All squares between the King and his destination must not be attacked
-        let squares_that_must_be_safe = ray_between(self.king_square, dst_square);
+        // All squares between the King and his destination (inclusive) must not be attacked
+        let squares_that_must_be_safe = ray_between(self.king_square, dst_square) | dst_square;
         let squares_are_safe = (squares_that_must_be_safe & enemy_attacks).is_empty();
 
-        Bitboard::from_square(dst_square)
+        // Bitboard::from_square(dst_square)
+        Bitboard::from_square(rook_square)
             & Bitboard::from_bool(squares_are_empty && squares_are_safe)
     }
 
@@ -867,7 +886,11 @@ impl fmt::Display for Game {
             }
 
             if rank == Rank::SEVEN {
-                write!(f, "           FEN: {}", self.to_fen())?;
+                if f.alternate() {
+                    write!(f, "           FEN: {:#}", self.position())?;
+                } else {
+                    write!(f, "           FEN: {}", self.position())?;
+                }
             } else if rank == Rank::SIX {
                 write!(f, "           Key: {}", self.key())?;
             } else if rank == Rank::FIVE {

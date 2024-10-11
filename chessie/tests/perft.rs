@@ -4,6 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+use anyhow::Result;
 use chessie::{perft, Game};
 
 fn test_perft_fen_nodes(depth: usize, fen: &str, expected: u64) {
@@ -12,9 +13,8 @@ fn test_perft_fen_nodes(depth: usize, fen: &str, expected: u64) {
     assert_eq!(res, expected);
 }
 
-#[test]
-fn test_standard_epd() {
-    let contents = std::fs::read_to_string("tests/standard.epd").unwrap();
+fn test_epd(epd_file: &str) -> Result<()> {
+    let contents = std::fs::read_to_string(epd_file)?;
 
     for (i, entry) in contents.lines().enumerate() {
         let mut parts = entry.split(';');
@@ -22,10 +22,10 @@ fn test_standard_epd() {
         let fen = parts.next().unwrap().trim();
 
         for perft_data in parts {
-            let depth = usize::from_str_radix(perft_data.get(1..2).unwrap().trim(), 10).unwrap();
-            let expected = u64::from_str_radix(perft_data.get(3..).unwrap().trim(), 10).unwrap();
+            let depth = usize::from_str_radix(perft_data.get(1..2).unwrap().trim(), 10)?;
+            let expected = u64::from_str_radix(perft_data.get(3..).unwrap().trim(), 10)?;
 
-            let mut position = Game::from_fen(fen).unwrap();
+            let mut position = Game::from_fen(fen)?;
 
             let nodes = perft(&mut position, depth);
 
@@ -35,6 +35,18 @@ fn test_standard_epd() {
             );
         }
     }
+
+    Ok(())
+}
+
+#[test]
+fn test_standard_epd() {
+    test_epd("tests/standard.epd").unwrap();
+}
+
+#[test]
+fn test_fischer_epd() {
+    test_epd("tests/fischer.epd").unwrap();
 }
 
 #[cfg(test)]

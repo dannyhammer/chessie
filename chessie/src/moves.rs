@@ -8,7 +8,7 @@ use std::{fmt, str::FromStr};
 
 use anyhow::{anyhow, Result};
 
-use super::{Piece, PieceKind, Position, Square};
+use super::{File, Piece, PieceKind, Position, Square};
 
 /// Represents the different kinds of moves that can be made during a chess game.
 ///
@@ -466,16 +466,25 @@ impl Move {
 
     /// Converts this [`Move`] to a string, according to the [Universal Chess Interface](https://en.wikipedia.org//wiki/Universal_Chess_Interface) notation.
     ///
-    /// Please note that promotions are capitalized by default.
+    /// Promotions are capitalized by default, and castling is displayed in the standard `e1g1` and `e1c1` notation.
     ///
     /// # Example
     /// ```
     /// # use chessie::{Move, Square, MoveKind, PieceKind};
     /// let e7e8Q = Move::new(Square::E7, Square::E8, MoveKind::promotion(PieceKind::Queen));
     /// assert_eq!(e7e8Q.to_uci(), "e7e8q");
+    /// let e1g1 = Move::new(Square::E1, Square::G1, MoveKind::ShortCastle);
+    /// assert_eq!(e1g1.to_uci(), "e1g1")
     /// ```
     pub fn to_uci(&self) -> String {
-        if let Some(promote) = self.promotion() {
+        // Since castling is encoded internally as KxR, we need to adjust them for UCI notation
+        if self.is_short_castle() {
+            let to = Square::new(File::G, self.from().rank());
+            format!("{}{to}", self.from())
+        } else if self.is_long_castle() {
+            let to = Square::new(File::C, self.from().rank());
+            format!("{}{to}", self.from())
+        } else if let Some(promote) = self.promotion() {
             format!("{}{}{}", self.from(), self.to(), promote)
         } else {
             format!("{}{}", self.from(), self.to())
@@ -486,9 +495,17 @@ impl Move {
 impl fmt::Display for Move {
     /// A [`Move`] is displayed in its UCI format.
     ///
-    /// See [`Move::to_uci`] for more.
+    /// If the alternate format mode (`#`) was specified, this will print the castling moves in Chess960 notation.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_uci())
+        if f.alternate() {
+            if let Some(promote) = self.promotion() {
+                write!(f, "{}{}{}", self.from(), self.to(), promote)
+            } else {
+                write!(f, "{}{}", self.from(), self.to())
+            }
+        } else {
+            write!(f, "{}", self.to_uci())
+        }
     }
 }
 
