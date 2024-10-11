@@ -1,6 +1,6 @@
 [package]
 name = "chessie"
-version = "1.1.0"
+version = "1.1.1"
 edition = "2021"
 build = "build.rs"
 authors = ["Danny Hammer <hammerapi@gmail.com>"]
@@ -13,10 +13,10 @@ keywords = ["chess"]
 [dependencies]
 anyhow = "1.0.86"
 arrayvec = "0.7.4"
-chessie_types = { path = "../chessie_types", version = "1.1.0" }
+chessie_types = { path = "../chessie_types", version = "1.1.1" }
 
 [build-dependencies]
-chessie_types = { path = "../chessie_types", version = "1.1.0" }
+chessie_types = { path = "../chessie_types", version = "1.1.1" }
 
 [dev-dependencies]
 criterion = "0.5.1"

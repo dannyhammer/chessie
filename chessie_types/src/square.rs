@@ -435,10 +435,11 @@ impl Square {
     /// ```
     /// # use chessie_types::Square;
     /// assert!(Square::C4.is_light());
+    /// assert!(Square::D7.is_light());
     /// ```
     #[inline(always)]
     pub const fn is_light(&self) -> bool {
-        (Bitboard::DARK_SQUARES.0 & self.0 as u64) != 0
+        Bitboard::DARK_SQUARES.and(self.bitboard()).is_empty()
     }
 
     /// Returns `true` if this [`Square`] is a dark square.
@@ -447,6 +448,7 @@ impl Square {
     /// ```
     /// # use chessie_types::Square;
     /// assert!(Square::C5.is_dark());
+    /// assert!(Square::F2.is_dark());
     /// ```
     #[inline(always)]
     pub const fn is_dark(&self) -> bool {
