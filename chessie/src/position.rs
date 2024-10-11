@@ -300,6 +300,75 @@ impl Position {
         self.halfmove() >= 100
     }
 
+    /// Returns `true` if there is insufficient material on the board to cause a checkmate.
+    ///
+    /// According to the [FIDE rules on draw conditions](https://handbook.fide.com/chapter/E012023):
+    /// >  The game is drawn when a position has arisen in which neither player can checkmate the opponent’s king with any series of legal moves. The game is said to end in a ‘dead position’. This immediately ends the game, provided that the move producing the position was in accordance with Article 3 and Articles 4.2 – 4.7.
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie::*;
+    /// // Lone Kings
+    /// let kk: Position = "8/4k3/8/8/3K4/8/8/8 w - - 0 1".parse().unwrap();
+    /// assert!(kk.can_draw_by_insufficient_material());
+    ///
+    /// // A single Bishop (either color)
+    /// let kbk: Position = "8/4k3/8/8/3K4/8/5B2/8 w - - 0 1".parse().unwrap();
+    /// assert!(kbk.can_draw_by_insufficient_material());
+    ///
+    /// // A single Knight
+    /// let knk: Position = "8/4k3/2n5/8/3K4/8/8/8 w - - 0 1".parse().unwrap();
+    /// assert!(knk.can_draw_by_insufficient_material());
+    ///
+    /// // Opposing Bishops on the same color square
+    /// let same_square_bishops: Position = "8/2b1k3/8/8/3K4/8/5B2/8 w - - 0 1".parse().unwrap();
+    /// assert!(same_square_bishops.can_draw_by_insufficient_material());
+    ///
+    /// // Opposing Bishops on different color squares
+    /// let diff_square_bishops: Position = "8/3bk3/8/8/3K4/8/5B2/8 w - - 0 1".parse().unwrap();
+    /// assert!(!diff_square_bishops.can_draw_by_insufficient_material());
+    /// ```
+    #[inline(always)]
+    pub fn can_draw_by_insufficient_material(&self) -> bool {
+        // If either side has a Queen, Rook, or Pawn, there remains sufficient material
+        if (self.kind(PieceKind::Queen) | self.kind(PieceKind::Rook) | self.kind(PieceKind::Pawn))
+            .is_nonempty()
+        {
+            return false;
+        }
+
+        // Get all of the minor pieces
+        let wb = self.bishops(Color::White);
+        let wn = self.knights(Color::White);
+        let bb = self.bishops(Color::Black);
+        let bn = self.knights(Color::Black);
+
+        // Match on all possible combinations
+        match (
+            wb.population(),
+            wn.population(),
+            bb.population(),
+            bn.population(),
+        ) {
+            // Lone kings...
+            (0, 0, 0, 0) |
+            // ...or a single bishop...
+            (1, 0, 0, 0) | (0, 0, 1, 0) |
+            // ...or a single knight...
+            (0, 1, 0, 0) | (0, 0, 0, 1) => true,
+
+            // ...or if each King has a single Bishop...
+            (1, 0, 1, 0) => {
+                // ...but only if the bishops are on the SAME color!
+                wb.to_square_unchecked().color()
+                    == bb.to_square_unchecked().color()
+            }
+
+            // All other cases have sufficient material, even if checkmate requires coercion.
+            _ => false,
+        }
+    }
+
     /// Toggles the current player from White to Black (or vice versa).
     #[inline(always)]
     pub fn toggle_side_to_move(&mut self) {
@@ -967,6 +1036,42 @@ impl Board {
         self.color(color).and(self.kind(kind))
     }
 
+    /// Fetches the [`Bitboard`] for the Pawns of the provided color.
+    #[inline(always)]
+    pub const fn pawns(&self, color: Color) -> Bitboard {
+        self.piece_parts(color, PieceKind::Pawn)
+    }
+
+    /// Fetches the [`Bitboard`] for the Knights of the provided color.
+    #[inline(always)]
+    pub const fn knights(&self, color: Color) -> Bitboard {
+        self.piece_parts(color, PieceKind::Knight)
+    }
+
+    /// Fetches the [`Bitboard`] for the Bishops of the provided color.
+    #[inline(always)]
+    pub const fn bishops(&self, color: Color) -> Bitboard {
+        self.piece_parts(color, PieceKind::Bishop)
+    }
+
+    /// Fetches the [`Bitboard`] for the Rooks of the provided color.
+    #[inline(always)]
+    pub const fn rooks(&self, color: Color) -> Bitboard {
+        self.piece_parts(color, PieceKind::Rook)
+    }
+
+    /// Fetches the [`Bitboard`] for the Queen(s) of the provided color.
+    #[inline(always)]
+    pub const fn queens(&self, color: Color) -> Bitboard {
+        self.piece_parts(color, PieceKind::Queen)
+    }
+
+    /// Fetches the [`Bitboard`] for the King of the provided color.
+    #[inline(always)]
+    pub const fn king(&self, color: Color) -> Bitboard {
+        self.piece_parts(color, PieceKind::King)
+    }
+
     /// Fetches a [`Bitboard`] containing the locations of all orthogonal sliding pieces (Rook, Queen).
     #[inline(always)]
     pub fn orthogonal_sliders(&self, color: Color) -> Bitboard {
@@ -984,24 +1089,6 @@ impl Board {
     pub fn sliders(&self, color: Color) -> Bitboard {
         (self.kind(PieceKind::Rook) | self.kind(PieceKind::Bishop) | self.kind(PieceKind::Queen))
             & self.color(color)
-    }
-
-    /// Fetches the [`Bitboard`] for the King of the provided color.
-    #[inline(always)]
-    pub const fn king(&self, color: Color) -> Bitboard {
-        self.piece_parts(color, PieceKind::King)
-    }
-
-    /// Fetches the [`Bitboard`] for the Pawns of the provided color.
-    #[inline(always)]
-    pub const fn pawns(&self, color: Color) -> Bitboard {
-        self.piece_parts(color, PieceKind::Pawn)
-    }
-
-    /// Fetches the [`Bitboard`] for the Knights of the provided color.
-    #[inline(always)]
-    pub const fn knights(&self, color: Color) -> Bitboard {
-        self.piece_parts(color, PieceKind::Knight)
     }
 
     /// Get all squares that are either empty or occupied by the enemy
