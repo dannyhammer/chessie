@@ -98,6 +98,8 @@ Special thanks in particular to:
 
 ## Changelog
 
+-   `1.2.1`:
+    -   Fixed major bug causing Zobrist keys to not update properly when making moves on positions (thanks @Serdra on the EP discord).
 -   `1.2.0`:
     -   Added `Position::can_draw_by_insufficient_material`.
     -   Fixed bug causing `Square::is_light` to return the opposite bool.

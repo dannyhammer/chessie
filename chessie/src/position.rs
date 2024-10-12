@@ -288,7 +288,9 @@ impl Position {
 
     /// Fetch the Zobrist hash key of this position.
     #[inline(always)]
-    pub const fn key(&self) -> ZobristKey {
+    pub fn key(&self) -> ZobristKey {
+        assert_eq!(self.key, ZobristKey::new(&self));
+
         self.key
     }
 
@@ -477,7 +479,7 @@ impl Position {
     /// Applies the move. No enforcement of legality
     pub fn make_move(&mut self, mv: Move) {
         // Remove the piece from it's previous location, exiting early if there is no piece there
-        let Some(mut piece) = self.board_mut().take(mv.from()) else {
+        let Some(mut piece) = self.take(mv.from()) else {
             return;
         };
 
@@ -485,8 +487,8 @@ impl Position {
         let to = mv.to();
         let from = mv.from();
 
-        // Un-hash the piece at `from`.
-        self.key.hash_piece(from, piece);
+        // Un-hash the side-to-move
+        self.key.hash_side_to_move(self.side_to_move());
 
         // Clear the EP square from the last move (and un-hash it)
         if let Some(ep_square) = self.ep_square.take() {
@@ -506,7 +508,7 @@ impl Position {
                 to
             };
 
-            let Some(captured) = self.board_mut().take(captured_square) else {
+            let Some(captured) = self.take(captured_square) else {
                 panic!("Failed to apply {mv:?} to {self}: No piece found at {captured_square}");
             };
             let captured_color = captured.color();
@@ -540,8 +542,8 @@ impl Position {
             let new_rook_square = [Square::D1, Square::F1][castle_index].rank_relative_to(color);
 
             // Move the rook. The King is already handled before and after this match statement.
-            let rook = self.board_mut().take(old_rook_square).unwrap();
-            self.board_mut().place(rook, new_rook_square);
+            let rook = self.take(old_rook_square).unwrap();
+            self.place(rook, new_rook_square);
 
             // Disable castling
             self.clear_castling_rights(color);
@@ -579,16 +581,28 @@ impl Position {
         }
 
         // Place the piece in it's new position
-        self.board_mut().place(piece, to);
-
-        // Hash the piece at `to`.
-        self.key.hash_piece(to, piece);
+        self.place(piece, to);
 
         // Next player's turn
         self.toggle_side_to_move();
 
         // Toggle the hash of the current player
         self.key.hash_side_to_move(self.side_to_move());
+    }
+
+    /// Places a piece at the provided square, updating Zobrist hash information.
+    #[inline(always)]
+    fn place(&mut self, piece: Piece, square: Square) {
+        self.board_mut().place(piece, square);
+        self.key.hash_piece(square, piece);
+    }
+
+    /// Removes and returns a piece on the provided square, updating Zobrist hash information.
+    #[inline(always)]
+    fn take(&mut self, square: Square) -> Option<Piece> {
+        let piece = self.board_mut().take(square)?;
+        self.key.hash_piece(square, piece);
+        Some(piece)
     }
 
     /// Clears the castling rights of `color`
@@ -1383,12 +1397,20 @@ mod tests {
 
         pos.make_move(Move::from_uci(&pos, "b1a3").unwrap());
         assert_ne!(pos.key(), original_key);
+        assert_eq!(pos.key(), ZobristKey::new(&pos));
+
         pos.make_move(Move::from_uci(&pos, "b8a6").unwrap());
         assert_ne!(pos.key(), original_key);
+        assert_eq!(pos.key(), ZobristKey::new(&pos));
+
         pos.make_move(Move::from_uci(&pos, "a3b1").unwrap());
         assert_ne!(pos.key(), original_key);
+        assert_eq!(pos.key(), ZobristKey::new(&pos));
+
+        // After returning to the original position, they keys should be equal again
         pos.make_move(Move::from_uci(&pos, "a6b8").unwrap());
         assert_eq!(pos.key(), original_key);
+        assert_eq!(pos.key(), ZobristKey::new(&pos));
     }
 
     // There are four cases in which castling rights can be lost:
@@ -1430,6 +1452,7 @@ mod tests {
         // Same for Black
         pos.make_move(Move::from_uci(&pos, "f8e8").unwrap());
         assert_ne!(pos.key(), original_key);
+        assert_eq!(pos.key(), ZobristKey::new(&pos));
         assert_ne!(pos.castling_rights(), &original_rights);
         assert_eq!(pos.castling_rights_uci(), "-");
     }
@@ -1482,12 +1505,14 @@ mod tests {
         // Capturing a Rook should disable castling on that side for the side that lost the Rook
         pos.make_move(Move::from_uci(&pos, "a1a8").unwrap());
         assert_ne!(pos.key(), original_key);
+        assert_eq!(pos.key(), ZobristKey::new(&pos));
         assert_ne!(pos.castling_rights(), &original_rights);
         assert_eq!(pos.castling_rights_uci(), "Kk"); // White used it's H1 Rook to capture, so they lose their rights on that side as well
 
         // Same for Black, on the other side
         pos.make_move(Move::from_uci(&pos, "h8h1").unwrap());
         assert_ne!(pos.key(), original_key);
+        assert_eq!(pos.key(), ZobristKey::new(&pos));
         assert_ne!(pos.castling_rights(), &original_rights);
         assert_eq!(pos.castling_rights_uci(), "-");
     }
@@ -1505,12 +1530,14 @@ mod tests {
         // Performing castling should remove that side's rights altogether
         pos.make_move(Move::from_uci(&pos, "e1g1").unwrap());
         assert_ne!(pos.key(), original_key);
+        assert_eq!(pos.key(), ZobristKey::new(&pos));
         assert_ne!(pos.castling_rights(), &original_rights);
         assert_eq!(pos.castling_rights_uci(), "kq");
 
         // Same for Black, on the other side
         pos.make_move(Move::from_uci(&pos, "e8c8").unwrap());
         assert_ne!(pos.key(), original_key);
+        assert_eq!(pos.key(), ZobristKey::new(&pos));
         assert_ne!(pos.castling_rights(), &original_rights);
         assert_eq!(pos.castling_rights_uci(), "-");
     }
