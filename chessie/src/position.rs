@@ -289,8 +289,6 @@ impl Position {
     /// Fetch the Zobrist hash key of this position.
     #[inline(always)]
     pub fn key(&self) -> ZobristKey {
-        assert_eq!(self.key, ZobristKey::new(&self));
-
         self.key
     }
 
