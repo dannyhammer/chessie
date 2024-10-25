@@ -115,7 +115,8 @@ impl MoveKind {
         let color = piece.color();
 
         // By default, it's either a quiet or a capture.
-        let mut kind = if position.has(to) {
+        let victim = position.piece_at(to);
+        let mut kind = if victim.is_some() {
             Self::Capture
         } else {
             Self::Quiet
@@ -140,11 +141,24 @@ impl MoveKind {
             else if from.rank().abs_diff(to.rank()) == 2 {
                 kind = Self::PawnDoublePush;
             }
-        } else if piece.is_king() && from == Square::E1.rank_relative_to(color) {
-            if to == Square::G1.rank_relative_to(color) {
-                kind = Self::ShortCastle;
-            } else if to == Square::C1.rank_relative_to(color) {
-                kind = Self::LongCastle;
+        } else if piece.is_king() {
+            // Standard castling
+            if from == Square::E1.rank_relative_to(color) {
+                if to == Square::G1.rank_relative_to(color) {
+                    kind = Self::ShortCastle;
+                } else if to == Square::C1.rank_relative_to(color) {
+                    kind = Self::LongCastle;
+                }
+            } else
+            // Chess960 castling
+            if victim
+                .is_some_and(|victim| victim.color() == piece.color() && victim.is_rook())
+            {
+                if to.file() > from.file() {
+                    kind = Self::ShortCastle;
+                } else {
+                    kind = Self::LongCastle;
+                }
             }
         }
 

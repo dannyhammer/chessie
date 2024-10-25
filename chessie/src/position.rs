@@ -506,7 +506,7 @@ impl Position {
         };
 
         let color = piece.color();
-        let to = mv.to();
+        let mut to = mv.to();
         let from = mv.from();
 
         // Un-hash the side-to-move
@@ -558,14 +558,25 @@ impl Position {
             self.ep_square = from.forward_by(color, 1);
             self.key.hash_optional_ep_square(self.ep_square());
         } else if mv.is_castle() {
-            // TODO: Chess960
-            let castle_index = mv.is_short_castle() as usize;
-            let old_rook_square = [Square::A1, Square::H1][castle_index].rank_relative_to(color);
-            let new_rook_square = [Square::D1, Square::F1][castle_index].rank_relative_to(color);
+            let (new_rook_square, new_king_square) = if mv.is_short_castle() {
+                (
+                    Square::F1.rank_relative_to(color),
+                    Square::G1.rank_relative_to(color),
+                )
+            } else {
+                (
+                    Square::D1.rank_relative_to(color),
+                    Square::C1.rank_relative_to(color),
+                )
+            };
 
-            // Move the rook. The King is already handled before and after this match statement.
-            let rook = self.take(old_rook_square).unwrap();
-            self.place(rook, new_rook_square);
+            // Move the rook. Moving the King is already handled before and after this if-else chain.
+            if let Some(rook) = self.take(to) {
+                self.place(rook, new_rook_square);
+            }
+
+            // The King doesn't actually move to the Rook, so update the destination square
+            to = new_king_square;
 
             // Disable castling
             self.clear_castling_rights(color);

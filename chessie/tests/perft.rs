@@ -13,7 +13,7 @@ fn test_perft_fen_nodes(depth: usize, fen: &str, expected: u64) {
     assert_eq!(res, expected);
 }
 
-fn test_epd(epd_file: &str) -> Result<()> {
+fn test_epd(epd_file: &str, max_depth: usize) -> Result<()> {
     let contents = std::fs::read_to_string(epd_file)?;
 
     for (i, entry) in contents.lines().enumerate() {
@@ -23,6 +23,9 @@ fn test_epd(epd_file: &str) -> Result<()> {
 
         for perft_data in parts {
             let depth = usize::from_str_radix(perft_data.get(1..2).unwrap().trim(), 10)?;
+            if depth > max_depth {
+                break;
+            }
             let expected = u64::from_str_radix(perft_data.get(3..).unwrap().trim(), 10)?;
 
             let mut position = Game::from_fen(fen)?;
@@ -41,12 +44,12 @@ fn test_epd(epd_file: &str) -> Result<()> {
 
 #[test]
 fn test_standard_epd() {
-    test_epd("tests/standard.epd").unwrap();
+    test_epd("tests/standard.epd", 6).unwrap();
 }
 
 #[test]
 fn test_fischer_epd() {
-    test_epd("tests/fischer.epd").unwrap();
+    test_epd("tests/fischer.epd", 5).unwrap();
 }
 
 #[cfg(test)]

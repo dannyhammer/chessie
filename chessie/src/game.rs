@@ -734,6 +734,7 @@ impl Game {
             let short = self.castling_rights_for(color).short.map(|rook| {
                 self.generate_castling_bitboard(
                     Square::new(rook, Rank::first(color)),
+                    Square::F1.rank_relative_to(color),
                     Square::G1.rank_relative_to(color),
                     enemy_attacks,
                 )
@@ -742,6 +743,7 @@ impl Game {
             let long = self.castling_rights_for(color).long.map(|rook| {
                 self.generate_castling_bitboard(
                     Square::new(rook, Rank::first(color)),
+                    Square::D1.rank_relative_to(color),
                     Square::C1.rank_relative_to(color),
                     enemy_attacks,
                 )
@@ -750,7 +752,7 @@ impl Game {
             short.unwrap_or_default() | long.unwrap_or_default()
         };
 
-        eprintln!("CASTLING:\n{castling:?}");
+        // eprintln!("CASTLING:\n{castling:?}");
 
         let discoverable_checks = self.generate_discoverable_checks_bitboard(color);
 
@@ -771,16 +773,25 @@ impl Game {
     fn generate_castling_bitboard(
         &self,
         rook_square: Square,
+        rook_dst_square: Square,
         dst_square: Square,
         enemy_attacks: Bitboard,
     ) -> Bitboard {
-        // All squares between the King and Rook must be empty
-        let blockers = self.occupied();
-        let squares_that_must_be_empty = ray_between(self.king_square, rook_square);
-        let squares_are_empty = (squares_that_must_be_empty & blockers).is_empty();
+        // All squares between the King, and Rook must be empty
+        let blockers = self.occupied() ^ self.king_square ^ rook_square;
+        // let squares_that_must_be_empty = ray_between(self.king_square, rook_square);
+        // let squares_are_empty = (squares_that_must_be_empty & blockers).is_empty();
+
+        // All squares between the King and his destination must be empty
+        let king_to_king_dst = ray_between(self.king_square, dst_square) | dst_square;
+        // All squares between the Rook and its destination must be empty
+        let rook_to_rook_dst = ray_between(rook_square, rook_dst_square) | rook_dst_square;
+        let squares_are_empty =
+            (rook_to_rook_dst & blockers).is_empty() && (king_to_king_dst & blockers).is_empty();
 
         // All squares between the King and his destination (inclusive) must not be attacked
-        let squares_that_must_be_safe = ray_between(self.king_square, dst_square) | dst_square;
+        let squares_that_must_be_safe =
+            ray_between(self.king_square, dst_square) | dst_square | (self.pinned() & rook_square);
         let squares_are_safe = (squares_that_must_be_safe & enemy_attacks).is_empty();
 
         // Bitboard::from_square(dst_square)
