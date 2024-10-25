@@ -49,6 +49,7 @@ fn test_standard_epd() {
 
 #[test]
 fn test_fischer_epd() {
+    // Depth 6 takes a *very* long time
     test_epd("tests/fischer.epd", 5).unwrap();
 }
 
@@ -199,5 +200,14 @@ mod special_perfts {
     #[test]
     fn test_special_perft_stalemate_and_checkmate_2() {
         test_perft_fen_nodes(4, "8/8/2k5/5q2/5n2/8/5K2/8 b - - 0 1", 23527);
+    }
+
+    #[test]
+    fn test_cannot_castle_when_rook_pinned() {
+        test_perft_fen_nodes(
+            1,
+            "Qr2kqbr/2bpp1pp/pn3p2/2p5/6P1/P1PP4/1P2PP1P/NRNBK1BR b HBhb - 0 9",
+            34,
+        );
     }
 }

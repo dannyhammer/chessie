@@ -524,30 +524,30 @@ impl Position {
         // First, deal with special cases like captures and castling
         if mv.is_capture() {
             // If this move was en passant, the piece we captured isn't at `to`, it's one square behind
-            let captured_square = if mv.is_en_passant() {
+            let victim_square = if mv.is_en_passant() {
                 to.backward_by(color, 1).unwrap()
             } else {
                 to
             };
 
-            let Some(captured) = self.take(captured_square) else {
-                panic!("Failed to apply {mv:?} to {self}: No piece found at {captured_square}");
+            let Some(victim) = self.take(victim_square) else {
+                panic!("Failed to apply {mv:?} to {self}: No piece found at {victim_square}");
             };
-            let captured_color = captured.color();
+            let victim_color = victim.color();
 
             // If the capture was on a rook's starting square, disable that side's castling.
-            if to.rank() == Rank::first(captured_color) {
-                // Either a rook was captured, or there wasn't a rook there, in which case castling on that side is already disabled
-                if self.castling_rights[captured_color]
+            if to.rank() == Rank::first(victim_color) {
+                // Either a rook was victim, or there wasn't a rook there, in which case castling on that side is already disabled
+                if self.castling_rights[victim_color]
                     .long
                     .is_some_and(|file| to.file() == file)
                 {
-                    self.clear_long_castling_rights(captured_color);
-                } else if self.castling_rights[captured_color]
+                    self.clear_long_castling_rights(victim_color);
+                } else if self.castling_rights[victim_color]
                     .short
                     .is_some_and(|file| to.file() == file)
                 {
-                    self.clear_short_castling_rights(captured_color);
+                    self.clear_short_castling_rights(victim_color);
                 }
             }
 
@@ -558,19 +558,20 @@ impl Position {
             self.ep_square = from.forward_by(color, 1);
             self.key.hash_optional_ep_square(self.ep_square());
         } else if mv.is_castle() {
+            // Get the destination squares for the King and Rook
             let (new_rook_square, new_king_square) = if mv.is_short_castle() {
                 (
-                    Square::F1.rank_relative_to(color),
-                    Square::G1.rank_relative_to(color),
+                    Square::rook_short_castle(color),
+                    Square::king_short_castle(color),
                 )
             } else {
                 (
-                    Square::D1.rank_relative_to(color),
-                    Square::C1.rank_relative_to(color),
+                    Square::rook_long_castle(color),
+                    Square::king_long_castle(color),
                 )
             };
 
-            // Move the rook. Moving the King is already handled before and after this if-else chain.
+            // Move the rook. Moving the King is already handled before and after this if-else chain
             if let Some(rook) = self.take(to) {
                 self.place(rook, new_rook_square);
             }

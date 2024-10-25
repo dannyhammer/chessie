@@ -732,41 +732,29 @@ impl Game {
         } else {
             // Otherwise, compute castling availability like normal
             let short = self.castling_rights_for(color).short.map(|rook| {
-                self.generate_castling_bitboard(
-                    Square::new(rook, Rank::first(color)),
-                    Square::F1.rank_relative_to(color),
-                    Square::G1.rank_relative_to(color),
-                    enemy_attacks,
-                )
+                let rook_start = Square::new(rook, Rank::first(color));
+                let king_end = Square::king_short_castle(color);
+                let rook_end = Square::rook_short_castle(color);
+                self.generate_castling_bitboard(rook_start, rook_end, king_end, enemy_attacks)
             });
 
             let long = self.castling_rights_for(color).long.map(|rook| {
-                self.generate_castling_bitboard(
-                    Square::new(rook, Rank::first(color)),
-                    Square::D1.rank_relative_to(color),
-                    Square::C1.rank_relative_to(color),
-                    enemy_attacks,
-                )
+                let rook_start = Square::new(rook, Rank::first(color));
+                let king_end = Square::king_long_castle(color);
+                let rook_end = Square::rook_long_castle(color);
+                self.generate_castling_bitboard(rook_start, rook_end, king_end, enemy_attacks)
             });
 
-            short.unwrap_or_default() | long.unwrap_or_default()
+            (short.unwrap_or_default() | long.unwrap_or_default())
+            // Can only castle to friendly Rooks
+                & self.piece_parts(color, PieceKind::Rook)
         };
 
-        // eprintln!("CASTLING:\n{castling:?}");
-
-        let discoverable_checks = self.generate_discoverable_checks_bitboard(color);
-
         // Safe squares are ones not attacked by the enemy or part of a discoverable check
-        let safe_squares = !(enemy_attacks | discoverable_checks);
+        let safe_squares = !(enemy_attacks | self.generate_discoverable_checks_bitboard(color));
 
-        // All legal attacks that are safe and not on friendly squares
-        // (attacks | castling) & safe_squares & self.enemy_or_empty(color)
-        // ((attacks & self.enemy_or_empty(color))
-        //     | (castling & self.piece_parts(color, PieceKind::Rook)))
-        //     & safe_squares
-
-        (attacks & self.enemy_or_empty(color) & safe_squares)
-            | (castling & self.piece_parts(color, PieceKind::Rook))
+        // All legal attacks that are safe and not on friendly squares, as well as castling
+        (attacks & self.enemy_or_empty(color) & safe_squares) | castling
     }
 
     /// Generate a bitboard for `color`'s ability to castle with the Rook on `rook_square`, which will place the King on `dst_square`.
@@ -777,24 +765,21 @@ impl Game {
         dst_square: Square,
         enemy_attacks: Bitboard,
     ) -> Bitboard {
-        // All squares between the King, and Rook must be empty
+        // The King and Rook don't count as blockers, since they're moving through each other
         let blockers = self.occupied() ^ self.king_square ^ rook_square;
-        // let squares_that_must_be_empty = ray_between(self.king_square, rook_square);
-        // let squares_are_empty = (squares_that_must_be_empty & blockers).is_empty();
 
         // All squares between the King and his destination must be empty
-        let king_to_king_dst = ray_between(self.king_square, dst_square) | dst_square;
+        let king_to_dst = ray_between(self.king_square, dst_square) | dst_square;
         // All squares between the Rook and its destination must be empty
-        let rook_to_rook_dst = ray_between(rook_square, rook_dst_square) | rook_dst_square;
+        let rook_to_dst = ray_between(rook_square, rook_dst_square) | rook_dst_square;
         let squares_are_empty =
-            (rook_to_rook_dst & blockers).is_empty() && (king_to_king_dst & blockers).is_empty();
+            (rook_to_dst & blockers).is_empty() && (king_to_dst & blockers).is_empty();
 
         // All squares between the King and his destination (inclusive) must not be attacked
         let squares_that_must_be_safe =
-            ray_between(self.king_square, dst_square) | dst_square | (self.pinned() & rook_square);
+            ray_between(self.king_square, dst_square) | dst_square | (self.pinned() & rook_square); // If the Rook is pinned, we can't castle
         let squares_are_safe = (squares_that_must_be_safe & enemy_attacks).is_empty();
 
-        // Bitboard::from_square(dst_square)
         Bitboard::from_square(rook_square)
             & Bitboard::from_bool(squares_are_empty && squares_are_safe)
     }
