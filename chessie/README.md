@@ -98,13 +98,22 @@ Special thanks in particular to:
 
 ## Changelog
 
+-   `1.2.1`:
+    -   Fixed major bug causing Zobrist keys to not update properly when making moves on positions (thanks @Serdra on the EP discord).
+-   `1.2.0`:
+    -   Added `Position::can_draw_by_insufficient_material`.
+    -   Fixed bug causing `Square::is_light` to return the opposite bool.
+-   `1.1.0`:
+    -   Fixed bug causing illegal positions to crash move generator
+    -   Implemented `FromIterator<Square>` for `Bitboard`.
+    -   Added function for playing null moves, and adjusted how `Game` is printed.
 -   `1.0.0`:
-    -   Massive performance increase (over 200%) in move generation ([benchmarks](https://github.com/dannyhammer/chessie-benchmarks))
-    -   `Game::get_legal_moves` now computes legal moves in bulk rather than relying on `MoveGenIter::collect`
-    -   Some breaking changes with method names in `Bitboard` and other primitives
-    -   General code cleanup (more docs, more tests, etc.)
+    -   Massive performance increase (over 200%) in move generation ([benchmarks](https://github.com/dannyhammer/chessie-benchmarks)).
+    -   `Game::get_legal_moves` now computes legal moves in bulk rather than relying on `MoveGenIter::collect`.
+    -   Some breaking changes with method names in `Bitboard` and other primitives.
+    -   General code cleanup (more docs, more tests, etc.).
     -   Added [`examples/`](./chessie/examples/) and [`benches`](./chessie/benches/).
-    -   Moved `prng.rs` into `chessie-types` so it can be used for magic generation, removing our dependency on `rand`
+    -   Moved `prng.rs` into `chessie-types` so it can be used for magic generation, removing our dependency on `rand`.
     -   Added `#[inline(always)]` to a _lot_ of functions/methods. Seems to have improved efficiency.
     -   Modified `CastlingRights` and it's storage in `Position`. Should make Chess960 integration easier later.
 -   `0.1.0`:

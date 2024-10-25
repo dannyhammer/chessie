@@ -312,7 +312,7 @@ impl Position {
 
     /// Fetch the Zobrist hash key of this position.
     #[inline(always)]
-    pub const fn key(&self) -> ZobristKey {
+    pub fn key(&self) -> ZobristKey {
         self.key
     }
 
@@ -322,6 +322,75 @@ impl Position {
     #[inline(always)]
     pub const fn can_draw_by_fifty(&self) -> bool {
         self.halfmove() >= 100
+    }
+
+    /// Returns `true` if there is insufficient material on the board to cause a checkmate.
+    ///
+    /// According to the [FIDE rules on draw conditions](https://handbook.fide.com/chapter/E012023):
+    /// >  The game is drawn when a position has arisen in which neither player can checkmate the opponent’s king with any series of legal moves. The game is said to end in a ‘dead position’. This immediately ends the game, provided that the move producing the position was in accordance with Article 3 and Articles 4.2 – 4.7.
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie::*;
+    /// // Lone Kings
+    /// let kk: Position = "8/4k3/8/8/3K4/8/8/8 w - - 0 1".parse().unwrap();
+    /// assert!(kk.can_draw_by_insufficient_material());
+    ///
+    /// // A single Bishop (either color)
+    /// let kbk: Position = "8/4k3/8/8/3K4/8/5B2/8 w - - 0 1".parse().unwrap();
+    /// assert!(kbk.can_draw_by_insufficient_material());
+    ///
+    /// // A single Knight
+    /// let knk: Position = "8/4k3/2n5/8/3K4/8/8/8 w - - 0 1".parse().unwrap();
+    /// assert!(knk.can_draw_by_insufficient_material());
+    ///
+    /// // Opposing Bishops on the same color square
+    /// let same_square_bishops: Position = "8/2b1k3/8/8/3K4/8/5B2/8 w - - 0 1".parse().unwrap();
+    /// assert!(same_square_bishops.can_draw_by_insufficient_material());
+    ///
+    /// // Opposing Bishops on different color squares
+    /// let diff_square_bishops: Position = "8/3bk3/8/8/3K4/8/5B2/8 w - - 0 1".parse().unwrap();
+    /// assert!(!diff_square_bishops.can_draw_by_insufficient_material());
+    /// ```
+    #[inline(always)]
+    pub fn can_draw_by_insufficient_material(&self) -> bool {
+        // If either side has a Queen, Rook, or Pawn, there remains sufficient material
+        if (self.kind(PieceKind::Queen) | self.kind(PieceKind::Rook) | self.kind(PieceKind::Pawn))
+            .is_nonempty()
+        {
+            return false;
+        }
+
+        // Get all of the minor pieces
+        let wb = self.bishops(Color::White);
+        let wn = self.knights(Color::White);
+        let bb = self.bishops(Color::Black);
+        let bn = self.knights(Color::Black);
+
+        // Match on all possible combinations
+        match (
+            wb.population(),
+            wn.population(),
+            bb.population(),
+            bn.population(),
+        ) {
+            // Lone kings...
+            (0, 0, 0, 0) |
+            // ...or a single bishop...
+            (1, 0, 0, 0) | (0, 0, 1, 0) |
+            // ...or a single knight...
+            (0, 1, 0, 0) | (0, 0, 0, 1) => true,
+
+            // ...or if each King has a single Bishop...
+            (1, 0, 1, 0) => {
+                // ...but only if the bishops are on the SAME color!
+                wb.to_square_unchecked().color()
+                    == bb.to_square_unchecked().color()
+            }
+
+            // All other cases have sufficient material, even if checkmate requires coercion.
+            _ => false,
+        }
     }
 
     /// Toggles the current player from White to Black (or vice versa).
@@ -432,7 +501,7 @@ impl Position {
     /// Applies the move. No enforcement of legality
     pub fn make_move(&mut self, mv: Move) {
         // Remove the piece from it's previous location, exiting early if there is no piece there
-        let Some(mut piece) = self.board_mut().take(mv.from()) else {
+        let Some(mut piece) = self.take(mv.from()) else {
             return;
         };
 
@@ -440,8 +509,8 @@ impl Position {
         let to = mv.to();
         let from = mv.from();
 
-        // Un-hash the piece at `from`.
-        self.key.hash_piece(from, piece);
+        // Un-hash the side-to-move
+        self.key.hash_side_to_move(self.side_to_move());
 
         // Clear the EP square from the last move (and un-hash it)
         if let Some(ep_square) = self.ep_square.take() {
@@ -461,7 +530,7 @@ impl Position {
                 to
             };
 
-            let Some(captured) = self.board_mut().take(captured_square) else {
+            let Some(captured) = self.take(captured_square) else {
                 panic!("Failed to apply {mv:?} to {self}: No piece found at {captured_square}");
             };
             let captured_color = captured.color();
@@ -495,8 +564,8 @@ impl Position {
             let new_rook_square = [Square::D1, Square::F1][castle_index].rank_relative_to(color);
 
             // Move the rook. The King is already handled before and after this match statement.
-            let rook = self.board_mut().take(old_rook_square).unwrap();
-            self.board_mut().place(rook, new_rook_square);
+            let rook = self.take(old_rook_square).unwrap();
+            self.place(rook, new_rook_square);
 
             // Disable castling
             self.clear_castling_rights(color);
@@ -534,16 +603,28 @@ impl Position {
         }
 
         // Place the piece in it's new position
-        self.board_mut().place(piece, to);
-
-        // Hash the piece at `to`.
-        self.key.hash_piece(to, piece);
+        self.place(piece, to);
 
         // Next player's turn
         self.toggle_side_to_move();
 
         // Toggle the hash of the current player
         self.key.hash_side_to_move(self.side_to_move());
+    }
+
+    /// Places a piece at the provided square, updating Zobrist hash information.
+    #[inline(always)]
+    fn place(&mut self, piece: Piece, square: Square) {
+        self.board_mut().place(piece, square);
+        self.key.hash_piece(square, piece);
+    }
+
+    /// Removes and returns a piece on the provided square, updating Zobrist hash information.
+    #[inline(always)]
+    fn take(&mut self, square: Square) -> Option<Piece> {
+        let piece = self.board_mut().take(square)?;
+        self.key.hash_piece(square, piece);
+        Some(piece)
     }
 
     /// Clears the castling rights of `color`
@@ -1014,6 +1095,42 @@ impl Board {
         self.color(color).and(self.kind(kind))
     }
 
+    /// Fetches the [`Bitboard`] for the Pawns of the provided color.
+    #[inline(always)]
+    pub const fn pawns(&self, color: Color) -> Bitboard {
+        self.piece_parts(color, PieceKind::Pawn)
+    }
+
+    /// Fetches the [`Bitboard`] for the Knights of the provided color.
+    #[inline(always)]
+    pub const fn knights(&self, color: Color) -> Bitboard {
+        self.piece_parts(color, PieceKind::Knight)
+    }
+
+    /// Fetches the [`Bitboard`] for the Bishops of the provided color.
+    #[inline(always)]
+    pub const fn bishops(&self, color: Color) -> Bitboard {
+        self.piece_parts(color, PieceKind::Bishop)
+    }
+
+    /// Fetches the [`Bitboard`] for the Rooks of the provided color.
+    #[inline(always)]
+    pub const fn rooks(&self, color: Color) -> Bitboard {
+        self.piece_parts(color, PieceKind::Rook)
+    }
+
+    /// Fetches the [`Bitboard`] for the Queen(s) of the provided color.
+    #[inline(always)]
+    pub const fn queens(&self, color: Color) -> Bitboard {
+        self.piece_parts(color, PieceKind::Queen)
+    }
+
+    /// Fetches the [`Bitboard`] for the King of the provided color.
+    #[inline(always)]
+    pub const fn king(&self, color: Color) -> Bitboard {
+        self.piece_parts(color, PieceKind::King)
+    }
+
     /// Fetches a [`Bitboard`] containing the locations of all orthogonal sliding pieces (Rook, Queen).
     #[inline(always)]
     pub fn orthogonal_sliders(&self, color: Color) -> Bitboard {
@@ -1031,24 +1148,6 @@ impl Board {
     pub fn sliders(&self, color: Color) -> Bitboard {
         (self.kind(PieceKind::Rook) | self.kind(PieceKind::Bishop) | self.kind(PieceKind::Queen))
             & self.color(color)
-    }
-
-    /// Fetches the [`Bitboard`] for the King of the provided color.
-    #[inline(always)]
-    pub const fn king(&self, color: Color) -> Bitboard {
-        self.piece_parts(color, PieceKind::King)
-    }
-
-    /// Fetches the [`Bitboard`] for the Pawns of the provided color.
-    #[inline(always)]
-    pub const fn pawns(&self, color: Color) -> Bitboard {
-        self.piece_parts(color, PieceKind::Pawn)
-    }
-
-    /// Fetches the [`Bitboard`] for the Knights of the provided color.
-    #[inline(always)]
-    pub const fn knights(&self, color: Color) -> Bitboard {
-        self.piece_parts(color, PieceKind::Knight)
     }
 
     /// Get all squares that are either empty or occupied by the enemy
@@ -1343,12 +1442,20 @@ mod tests {
 
         pos.make_move(Move::from_uci(&pos, "b1a3").unwrap());
         assert_ne!(pos.key(), original_key);
+        assert_eq!(pos.key(), ZobristKey::new(&pos));
+
         pos.make_move(Move::from_uci(&pos, "b8a6").unwrap());
         assert_ne!(pos.key(), original_key);
+        assert_eq!(pos.key(), ZobristKey::new(&pos));
+
         pos.make_move(Move::from_uci(&pos, "a3b1").unwrap());
         assert_ne!(pos.key(), original_key);
+        assert_eq!(pos.key(), ZobristKey::new(&pos));
+
+        // After returning to the original position, they keys should be equal again
         pos.make_move(Move::from_uci(&pos, "a6b8").unwrap());
         assert_eq!(pos.key(), original_key);
+        assert_eq!(pos.key(), ZobristKey::new(&pos));
     }
 
     // There are four cases in which castling rights can be lost:
@@ -1390,6 +1497,7 @@ mod tests {
         // Same for Black
         pos.make_move(Move::from_uci(&pos, "f8e8").unwrap());
         assert_ne!(pos.key(), original_key);
+        assert_eq!(pos.key(), ZobristKey::new(&pos));
         assert_ne!(pos.castling_rights(), &original_rights);
         assert_eq!(pos.castling_rights_uci(), "-");
     }
@@ -1442,12 +1550,14 @@ mod tests {
         // Capturing a Rook should disable castling on that side for the side that lost the Rook
         pos.make_move(Move::from_uci(&pos, "a1a8").unwrap());
         assert_ne!(pos.key(), original_key);
+        assert_eq!(pos.key(), ZobristKey::new(&pos));
         assert_ne!(pos.castling_rights(), &original_rights);
         assert_eq!(pos.castling_rights_uci(), "Kk"); // White used it's H1 Rook to capture, so they lose their rights on that side as well
 
         // Same for Black, on the other side
         pos.make_move(Move::from_uci(&pos, "h8h1").unwrap());
         assert_ne!(pos.key(), original_key);
+        assert_eq!(pos.key(), ZobristKey::new(&pos));
         assert_ne!(pos.castling_rights(), &original_rights);
         assert_eq!(pos.castling_rights_uci(), "-");
     }
@@ -1465,12 +1575,14 @@ mod tests {
         // Performing castling should remove that side's rights altogether
         pos.make_move(Move::from_uci(&pos, "e1g1").unwrap());
         assert_ne!(pos.key(), original_key);
+        assert_eq!(pos.key(), ZobristKey::new(&pos));
         assert_ne!(pos.castling_rights(), &original_rights);
         assert_eq!(pos.castling_rights_uci(), "kq");
 
         // Same for Black, on the other side
         pos.make_move(Move::from_uci(&pos, "e8c8").unwrap());
         assert_ne!(pos.key(), original_key);
+        assert_eq!(pos.key(), ZobristKey::new(&pos));
         assert_ne!(pos.castling_rights(), &original_rights);
         assert_eq!(pos.castling_rights_uci(), "-");
     }
