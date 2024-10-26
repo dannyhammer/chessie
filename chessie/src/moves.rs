@@ -178,6 +178,30 @@ impl MoveKind {
     }
 }
 
+impl fmt::Display for MoveKind {
+    /// Displays a human-readable description for this [`MoveKind`].
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::Quiet => "Quiet",
+            Self::PawnDoublePush => "Pawn Double Push",
+            Self::EnPassantCapture => "En Passant Capture",
+            Self::ShortCastle => "Short Castle",
+            Self::LongCastle => "Long Castle",
+            Self::Capture => "Capture",
+            Self::PromoteQueen => "Promotion (Queen)",
+            Self::PromoteKnight => "Promotion (Knight)",
+            Self::PromoteRook => "Promotion (Rook)",
+            Self::PromoteBishop => "Promotion (Bishop)",
+            Self::CaptureAndPromoteQueen => "Capture and Promotion (Queen)",
+            Self::CaptureAndPromoteKnight => "Capture and Promotion (Knight)",
+            Self::CaptureAndPromoteRook => "Capture and Promotion (Rook)",
+            Self::CaptureAndPromoteBishop => "Capture and Promotion (Bishop)",
+        };
+
+        write!(f, "{s}")
+    }
+}
+
 /// Represents a move made on a chess board, including whether a piece is to be promoted.
 ///
 /// Internally encoded using the following bit pattern:
@@ -492,16 +516,34 @@ impl Move {
     /// ```
     pub fn to_uci(&self) -> String {
         // Since castling is encoded internally as KxR, we need to adjust them for UCI notation
-        if self.is_short_castle() {
-            let to = Square::new(File::G, self.from().rank());
-            format!("{}{to}", self.from())
-        } else if self.is_long_castle() {
-            let to = Square::new(File::C, self.from().rank());
-            format!("{}{to}", self.from())
-        } else if let Some(promote) = self.promotion() {
-            format!("{}{}{}", self.from(), self.to(), promote)
+        let mv = self.into_standard_castle();
+        if let Some(promote) = mv.promotion() {
+            format!("{}{}{}", mv.from(), mv.to(), promote)
         } else {
-            format!("{}{}", self.from(), self.to())
+            format!("{}{}", mv.from(), mv.to())
+        }
+    }
+
+    /// Changes the `to` field of a castling move to align with the standard
+    /// `e1g1` / `e1c1` / `e8g8` / `e8c8` notation.
+    ///
+    /// If `self` is not a castling move, this does not alter `self`.
+    ///
+    /// Internally, [`Move`] uses the Chess960 "King takes Rook" to represent castling.
+    /// This is only ever an issue when you need to print moves,
+    /// and luckily the [`fmt::Display`] implementation of [`Move`] allows you to toggle
+    /// between standard and Chess960 notation with the alternate formatter (`#`).
+    #[inline(always)]
+    pub fn into_standard_castle(self) -> Self {
+        if self.is_short_castle() {
+            let new_to = Square::new(File::G, self.from().rank());
+            Self::new(self.from(), new_to, self.kind())
+        } else if self.is_long_castle() {
+            let new_to = Square::new(File::C, self.from().rank());
+            Self::new(self.from(), new_to, self.kind())
+        } else {
+            // If this move isn't a castle, no modification needs to be done
+            self
         }
     }
 }
@@ -524,8 +566,15 @@ impl fmt::Display for Move {
 }
 
 impl fmt::Debug for Move {
+    /// Debug formatting will call the [`fmt::Display`] implementation
+    /// (taking into account the alternate formatter, if provided)
+    /// and will also debug print the [`MoveKind`].
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} ({:?})", self.to_uci(), self.kind())
+        if f.alternate() {
+            write!(f, "{self:#} ({:?})", self.kind())
+        } else {
+            write!(f, "{self} ({:?})", self.kind())
+        }
     }
 }
 

@@ -90,6 +90,34 @@ impl Game {
         Ok(Self::new(Position::from_fen(fen)?))
     }
 
+    /// Converts a [Scharnagl Number](https://en.wikipedia.org/wiki/Fischer_random_chess_numbering_scheme#Direct_derivation) to a Chess960 starting position.
+    ///
+    /// # Panics
+    ///
+    /// If `n >= 960`, as there are only 960 valid starting positions.
+    ///
+    /// # Examples
+    /// ```
+    /// # use chessie::*;
+    /// // 518 is the Scharnagl number for startpos
+    /// let startpos = Game::from_frc(518);
+    /// assert_eq!(startpos, Game::from_fen(FEN_STARTPOS).unwrap());
+    /// ```
+    #[inline(always)]
+    pub fn from_frc(n: usize) -> Self {
+        Self::new(Position::from_dfrc(n, n))
+    }
+
+    /// Converts a pair of [Scharnagl Numbers](https://en.wikipedia.org/wiki/Fischer_random_chess_numbering_scheme#Direct_derivation) to a Double Fischer Random Chess starting position.
+    ///
+    /// # Panics
+    ///
+    /// If either Scharnagl number `>= 960`, as there are only 960 valid starting positions.
+    #[inline(always)]
+    pub fn from_dfrc(white_scharnagl: usize, black_scharnagl: usize) -> Self {
+        Self::new(Position::from_dfrc(white_scharnagl, black_scharnagl))
+    }
+
     /// Copies `self` and returns a [`Game`] after having applied the provided [`Move`].
     #[inline(always)]
     pub fn with_move_made(&self, mv: Move) -> Self {
@@ -883,16 +911,16 @@ impl fmt::Display for Game {
 
             if rank == Rank::SEVEN {
                 if f.alternate() {
-                    write!(f, "           FEN: {:#}", self.position())?;
+                    write!(f, "        FEN: {:#}", self.position())?;
                 } else {
-                    write!(f, "           FEN: {}", self.position())?;
+                    write!(f, "        FEN: {}", self.position())?;
                 }
             } else if rank == Rank::SIX {
-                write!(f, "           Key: {}", self.key())?;
+                write!(f, "        Key: {}", self.key())?;
             } else if rank == Rank::FIVE {
-                write!(f, "      Checkers: {}", squares_to_string(self.checkers()))?;
+                write!(f, "   Checkers: {}", squares_to_string(self.checkers()))?;
             } else if rank == Rank::FOUR {
-                write!(f, "        Pinned: {}", squares_to_string(self.pinned()))?;
+                write!(f, "     Pinned: {}", squares_to_string(self.pinned()))?;
                 // } else if rank == Rank::THREE {
                 // } else if rank == Rank::TWO {
                 // } else if rank == Rank::ONE {

@@ -9,17 +9,17 @@
 pub use chessie_types::*;
 
 /// High-level abstraction of the game of chess, including movable pieces, legality checks, game state, etc.
-pub mod game;
+mod game;
 /// All code related to generating moves (legal and pseudo-legal) for pieces on a board.
-pub mod movegen;
+mod movegen;
 /// Enums and structs for modeling the movement of a piece on a chessboard.
-pub mod moves;
+mod moves;
 /// Utility function for performance testing.
-pub mod perft;
+mod perft;
 /// A chessboard, complete with piece placements, turn counters, and game state information.
-pub mod position;
+mod position;
 /// Zobrist keys for hashing chess positions.
-pub mod zobrist;
+mod zobrist;
 
 pub use game::*;
 pub use movegen::*;
@@ -35,6 +35,6 @@ pub mod prelude {
     pub use crate::moves::*;
     pub use crate::perft::*;
     pub use crate::position::*;
-    pub use crate::utils::*;
     pub use crate::zobrist::*;
+    pub use chessie_types::*;
 }

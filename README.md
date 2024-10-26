@@ -1,6 +1,6 @@
 # Chessie
 
-A fast chess library, suitable for use in chess engines.
+A fast Chess / [Chess960](https://en.wikipedia.org/wiki/Fischer_random_chess) library, suitable for use in chess engines.
 
 ## Overview
 
@@ -76,13 +76,13 @@ Several state-of-the-art chess programming ideas have been incorporated into thi
 -   [Bitboards](https://www.chessprogramming.org/Bitboards) for piece layout and move generation.
 -   [Magic Bitboards](https://www.chessprogramming.org/Magic_Bitboards) for sliding piece move generation.
 -   And many more that I may have neglected to mention
+-   [Chess960](https://www.chessprogramming.org/Chess960) (and Double Chess960) support, with utility functions for converting to/from standard/Chess960 notation for castling rights, FEN strings, and castling moves.
 
 ### Future
 
 -   Support for parsing/writing [Extended Position Description](https://www.chessprogramming.org/Extended_Position_Description) (EPD).
 -   Support for parsing/writing [Portable Game Notation](https://en.wikipedia.org/wiki/Portable_Game_Notation) (PGN).
 -   Support for parsing/writing [Standard Algebraic Notation](<https://en.wikipedia.org/wiki/Algebraic_notation_(chess)>) (SAN).
--   [Chess960](https://www.chessprogramming.org/Chess960) support.
 -   Support for other variants, like [Horde Chess](https://www.chess.com/terms/horde-chess).
 -   Proper support for un-making moves.
 -   General optimizations. See the "Issues" tab for more.
@@ -98,6 +98,13 @@ Special thanks in particular to:
 
 ## Changelog
 
+-   `1.3.0`:
+    -   Added support for Chess960 (Fischer Random) and Double Chess960 (Double Fischer Random).
+        -   Internally changed the representation of Castling moves to "King takes Rook" to support Chess960.
+        -   Added utilities for converting to/from Chess960 and standard castling moves.
+        -   All `Display` implementations now utilize the alternate formatter (`#`) to print either standard or Chess960 notation for FEN strings, castling rights, and castling moves (Thanks to [`cozy_chess`](https://docs.rs/cozy-chess/latest/cozy_chess/) for this idea).
+    -   Made modules private so their re-exports don't clutter up the docs.
+    -   Added a `Display` implementation for `MoveKind`.
 -   `1.2.1`:
     -   Fixed major bug causing Zobrist keys to not update properly when making moves on positions (thanks @Serdra on the EP discord).
 -   `1.2.0`:
