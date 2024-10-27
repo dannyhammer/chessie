@@ -11,11 +11,12 @@ use colored::*;
 use chessie::{perft, Game};
 
 /// Total number of nodes in the `standard.epd` test suite.
-const TOTAL_NODES_IN_SUITE: u64 = 4805793839;
+const TOTAL_NODES_IN_SUITE: u64 = 13081877793;
+const PERFT_SUITE: &str = "chessie/tests/standard.epd";
 
 /// Run `perft` on all positions in `standard.epd`, timing the result
 fn main() {
-    let contents = std::fs::read_to_string("chessie/tests/standard.epd").unwrap();
+    let contents = std::fs::read_to_string(PERFT_SUITE).unwrap();
 
     let mut total_nodes_tested = 0;
 
