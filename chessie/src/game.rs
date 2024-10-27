@@ -90,6 +90,34 @@ impl Game {
         Ok(Self::new(Position::from_fen(fen)?))
     }
 
+    /// Converts a [Scharnagl Number](https://en.wikipedia.org/wiki/Fischer_random_chess_numbering_scheme#Direct_derivation) to a Chess960 starting position.
+    ///
+    /// # Panics
+    ///
+    /// If `n >= 960`, as there are only 960 valid starting positions.
+    ///
+    /// # Examples
+    /// ```
+    /// # use chessie::*;
+    /// // 518 is the Scharnagl number for startpos
+    /// let startpos = Game::from_frc(518);
+    /// assert_eq!(startpos, Game::from_fen(FEN_STARTPOS).unwrap());
+    /// ```
+    #[inline(always)]
+    pub fn from_frc(n: usize) -> Self {
+        Self::new(Position::from_dfrc(n, n))
+    }
+
+    /// Converts a pair of [Scharnagl Numbers](https://en.wikipedia.org/wiki/Fischer_random_chess_numbering_scheme#Direct_derivation) to a Double Fischer Random Chess starting position.
+    ///
+    /// # Panics
+    ///
+    /// If either Scharnagl number `>= 960`, as there are only 960 valid starting positions.
+    #[inline(always)]
+    pub fn from_dfrc(white_scharnagl: usize, black_scharnagl: usize) -> Self {
+        Self::new(Position::from_dfrc(white_scharnagl, black_scharnagl))
+    }
+
     /// Copies `self` and returns a [`Game`] after having applied the provided [`Move`].
     #[inline(always)]
     pub fn with_move_made(&self, mv: Move) -> Self {
@@ -278,7 +306,6 @@ impl Game {
 
         // If it's a castle, we need to move the Rook
         if mv.is_castle() {
-            // TODO: Chess960
             let castle_index = mv.is_short_castle() as usize;
             let old_rook_square = [Square::A1, Square::H1][castle_index].rank_relative_to(color);
             let new_rook_square = [Square::D1, Square::F1][castle_index].rank_relative_to(color);
@@ -479,16 +506,27 @@ impl Game {
         let from = self.king_square;
         let color = self.side_to_move();
         for to in self.generate_legal_king_mobility::<IN_CHECK>(color, from) {
-            let mut kind = if self.has(to) {
+            let victim = self.piece_at(to);
+            let mut kind = if victim.is_some() {
                 MoveKind::Capture
             } else {
                 MoveKind::Quiet
             };
 
-            if from == Square::E1.rank_relative_to(color) {
-                if to == Square::G1.rank_relative_to(color) {
+            // if from == Square::E1.rank_relative_to(color) {
+            //     if to == Square::G1.rank_relative_to(color) {
+            //         kind = MoveKind::ShortCastle;
+            //     } else if to == Square::C1.rank_relative_to(color) {
+            //         kind = MoveKind::LongCastle;
+            //     }
+            // }
+
+            // If this move "captures" our own Rook, it is castling
+            if victim.is_some_and(|p| p.is_rook() && p.color() == color) {
+                // Determine which side of castling this is
+                if to.file() > from.file() {
                     kind = MoveKind::ShortCastle;
-                } else if to == Square::C1.rank_relative_to(color) {
+                } else {
                     kind = MoveKind::LongCastle;
                 }
             }
@@ -722,50 +760,55 @@ impl Game {
         } else {
             // Otherwise, compute castling availability like normal
             let short = self.castling_rights_for(color).short.map(|rook| {
-                self.generate_castling_bitboard(
-                    Square::new(rook, Rank::first(color)),
-                    Square::G1.rank_relative_to(color),
-                    enemy_attacks,
-                )
+                let rook_start = Square::new(rook, Rank::first(color));
+                let king_end = Square::king_short_castle(color);
+                let rook_end = Square::rook_short_castle(color);
+                self.generate_castling_bitboard(rook_start, rook_end, king_end, enemy_attacks)
             });
 
             let long = self.castling_rights_for(color).long.map(|rook| {
-                self.generate_castling_bitboard(
-                    Square::new(rook, Rank::first(color)),
-                    Square::C1.rank_relative_to(color),
-                    enemy_attacks,
-                )
+                let rook_start = Square::new(rook, Rank::first(color));
+                let king_end = Square::king_long_castle(color);
+                let rook_end = Square::rook_long_castle(color);
+                self.generate_castling_bitboard(rook_start, rook_end, king_end, enemy_attacks)
             });
 
-            short.unwrap_or_default() | long.unwrap_or_default()
+            (short.unwrap_or_default() | long.unwrap_or_default())
+            // Can only castle to friendly Rooks
+                & self.piece_parts(color, PieceKind::Rook)
         };
 
-        let discoverable_checks = self.generate_discoverable_checks_bitboard(color);
-
         // Safe squares are ones not attacked by the enemy or part of a discoverable check
-        let safe_squares = !(enemy_attacks | discoverable_checks);
+        let safe_squares = !(enemy_attacks | self.generate_discoverable_checks_bitboard(color));
 
-        // All legal attacks that are safe and not on friendly squares
-        (attacks | castling) & safe_squares & self.enemy_or_empty(color)
+        // All legal attacks that are safe and not on friendly squares, as well as castling
+        (attacks & self.enemy_or_empty(color) & safe_squares) | castling
     }
 
     /// Generate a bitboard for `color`'s ability to castle with the Rook on `rook_square`, which will place the King on `dst_square`.
     fn generate_castling_bitboard(
         &self,
         rook_square: Square,
+        rook_dst_square: Square,
         dst_square: Square,
         enemy_attacks: Bitboard,
     ) -> Bitboard {
-        // All squares between the King and Rook must be empty
-        let blockers = self.occupied();
-        let squares_that_must_be_empty = ray_between(self.king_square, rook_square);
-        let squares_are_empty = (squares_that_must_be_empty & blockers).is_empty();
+        // The King and Rook don't count as blockers, since they're moving through each other
+        let blockers = self.occupied() ^ self.king_square ^ rook_square;
 
-        // All squares between the King and his destination must not be attacked
-        let squares_that_must_be_safe = ray_between(self.king_square, dst_square);
+        // All squares between the King and his destination must be empty
+        let king_to_dst = ray_between(self.king_square, dst_square) | dst_square;
+        // All squares between the Rook and its destination must be empty
+        let rook_to_dst = ray_between(rook_square, rook_dst_square) | rook_dst_square;
+        let squares_are_empty =
+            (rook_to_dst & blockers).is_empty() && (king_to_dst & blockers).is_empty();
+
+        // All squares between the King and his destination (inclusive) must not be attacked
+        let squares_that_must_be_safe =
+            ray_between(self.king_square, dst_square) | dst_square | (self.pinned() & rook_square); // If the Rook is pinned, we can't castle
         let squares_are_safe = (squares_that_must_be_safe & enemy_attacks).is_empty();
 
-        Bitboard::from_square(dst_square)
+        Bitboard::from_square(rook_square)
             & Bitboard::from_bool(squares_are_empty && squares_are_safe)
     }
 
@@ -867,13 +910,17 @@ impl fmt::Display for Game {
             }
 
             if rank == Rank::SEVEN {
-                write!(f, "           FEN: {}", self.to_fen())?;
+                if f.alternate() {
+                    write!(f, "        FEN: {:#}", self.position())?;
+                } else {
+                    write!(f, "        FEN: {}", self.position())?;
+                }
             } else if rank == Rank::SIX {
-                write!(f, "           Key: {}", self.key())?;
+                write!(f, "        Key: {}", self.key())?;
             } else if rank == Rank::FIVE {
-                write!(f, "      Checkers: {}", squares_to_string(self.checkers()))?;
+                write!(f, "   Checkers: {}", squares_to_string(self.checkers()))?;
             } else if rank == Rank::FOUR {
-                write!(f, "        Pinned: {}", squares_to_string(self.pinned()))?;
+                write!(f, "     Pinned: {}", squares_to_string(self.pinned()))?;
                 // } else if rank == Rank::THREE {
                 // } else if rank == Rank::TWO {
                 // } else if rank == Rank::ONE {

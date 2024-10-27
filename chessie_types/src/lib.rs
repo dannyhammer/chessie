@@ -7,17 +7,17 @@
 #![doc = include_str!("../README.md")]
 
 /// All things related to Bitboards.
-pub mod bitboard;
+mod bitboard;
 /// Enums for piece kinds, colors, and a struct for a chess piece.
-pub mod piece;
+mod piece;
 /// Pseudo-random number generation, written to be usable in `const` settings.
 ///
 /// Primarily for Zobrist hashing and magic generation.
-pub mod prng;
+mod prng;
 /// Squares on a chessboard (including files and ranks).
-pub mod square;
+mod square;
 /// Misc utility functions and constants, as well as magic bitboard generation.
-pub mod utils;
+mod utils;
 
 pub use bitboard::*;
 pub use piece::*;

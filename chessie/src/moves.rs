@@ -8,7 +8,7 @@ use std::{fmt, str::FromStr};
 
 use anyhow::{anyhow, Result};
 
-use super::{Piece, PieceKind, Position, Square};
+use super::{File, Piece, PieceKind, Position, Square};
 
 /// Represents the different kinds of moves that can be made during a chess game.
 ///
@@ -115,7 +115,8 @@ impl MoveKind {
         let color = piece.color();
 
         // By default, it's either a quiet or a capture.
-        let mut kind = if position.has(to) {
+        let victim = position.piece_at(to);
+        let mut kind = if victim.is_some() {
             Self::Capture
         } else {
             Self::Quiet
@@ -140,11 +141,24 @@ impl MoveKind {
             else if from.rank().abs_diff(to.rank()) == 2 {
                 kind = Self::PawnDoublePush;
             }
-        } else if piece.is_king() && from == Square::E1.rank_relative_to(color) {
-            if to == Square::G1.rank_relative_to(color) {
-                kind = Self::ShortCastle;
-            } else if to == Square::C1.rank_relative_to(color) {
-                kind = Self::LongCastle;
+        } else if piece.is_king() {
+            // Standard castling
+            if from == Square::E1.rank_relative_to(color) {
+                if to == Square::G1.rank_relative_to(color) {
+                    kind = Self::ShortCastle;
+                } else if to == Square::C1.rank_relative_to(color) {
+                    kind = Self::LongCastle;
+                }
+            } else
+            // Chess960 castling
+            if victim
+                .is_some_and(|victim| victim.color() == piece.color() && victim.is_rook())
+            {
+                if to.file() > from.file() {
+                    kind = Self::ShortCastle;
+                } else {
+                    kind = Self::LongCastle;
+                }
             }
         }
 
@@ -161,6 +175,30 @@ impl MoveKind {
             Self::PromoteBishop | Self::CaptureAndPromoteBishop => Some(PieceKind::Bishop),
             _ => None,
         }
+    }
+}
+
+impl fmt::Display for MoveKind {
+    /// Displays a human-readable description for this [`MoveKind`].
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::Quiet => "Quiet",
+            Self::PawnDoublePush => "Pawn Double Push",
+            Self::EnPassantCapture => "En Passant Capture",
+            Self::ShortCastle => "Short Castle",
+            Self::LongCastle => "Long Castle",
+            Self::Capture => "Capture",
+            Self::PromoteQueen => "Promotion (Queen)",
+            Self::PromoteKnight => "Promotion (Knight)",
+            Self::PromoteRook => "Promotion (Rook)",
+            Self::PromoteBishop => "Promotion (Bishop)",
+            Self::CaptureAndPromoteQueen => "Capture and Promotion (Queen)",
+            Self::CaptureAndPromoteKnight => "Capture and Promotion (Knight)",
+            Self::CaptureAndPromoteRook => "Capture and Promotion (Rook)",
+            Self::CaptureAndPromoteBishop => "Capture and Promotion (Bishop)",
+        };
+
+        write!(f, "{s}")
     }
 }
 
@@ -466,19 +504,46 @@ impl Move {
 
     /// Converts this [`Move`] to a string, according to the [Universal Chess Interface](https://en.wikipedia.org//wiki/Universal_Chess_Interface) notation.
     ///
-    /// Please note that promotions are capitalized by default.
+    /// Promotions are capitalized by default, and castling is displayed in the standard `e1g1` and `e1c1` notation.
     ///
     /// # Example
     /// ```
     /// # use chessie::{Move, Square, MoveKind, PieceKind};
     /// let e7e8Q = Move::new(Square::E7, Square::E8, MoveKind::promotion(PieceKind::Queen));
     /// assert_eq!(e7e8Q.to_uci(), "e7e8q");
+    /// let e1g1 = Move::new(Square::E1, Square::G1, MoveKind::ShortCastle);
+    /// assert_eq!(e1g1.to_uci(), "e1g1")
     /// ```
     pub fn to_uci(&self) -> String {
-        if let Some(promote) = self.promotion() {
-            format!("{}{}{}", self.from(), self.to(), promote)
+        // Since castling is encoded internally as KxR, we need to adjust them for UCI notation
+        let mv = self.into_standard_castle();
+        if let Some(promote) = mv.promotion() {
+            format!("{}{}{}", mv.from(), mv.to(), promote)
         } else {
-            format!("{}{}", self.from(), self.to())
+            format!("{}{}", mv.from(), mv.to())
+        }
+    }
+
+    /// Changes the `to` field of a castling move to align with the standard
+    /// `e1g1` / `e1c1` / `e8g8` / `e8c8` notation.
+    ///
+    /// If `self` is not a castling move, this does not alter `self`.
+    ///
+    /// Internally, [`Move`] uses the Chess960 "King takes Rook" to represent castling.
+    /// This is only ever an issue when you need to print moves,
+    /// and luckily the [`fmt::Display`] implementation of [`Move`] allows you to toggle
+    /// between standard and Chess960 notation with the alternate formatter (`#`).
+    #[inline(always)]
+    pub fn into_standard_castle(self) -> Self {
+        if self.is_short_castle() {
+            let new_to = Square::new(File::G, self.from().rank());
+            Self::new(self.from(), new_to, self.kind())
+        } else if self.is_long_castle() {
+            let new_to = Square::new(File::C, self.from().rank());
+            Self::new(self.from(), new_to, self.kind())
+        } else {
+            // If this move isn't a castle, no modification needs to be done
+            self
         }
     }
 }
@@ -486,15 +551,30 @@ impl Move {
 impl fmt::Display for Move {
     /// A [`Move`] is displayed in its UCI format.
     ///
-    /// See [`Move::to_uci`] for more.
+    /// If the alternate format mode (`#`) was specified, this will print the castling moves in Chess960 notation.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_uci())
+        if f.alternate() {
+            if let Some(promote) = self.promotion() {
+                write!(f, "{}{}{}", self.from(), self.to(), promote)
+            } else {
+                write!(f, "{}{}", self.from(), self.to())
+            }
+        } else {
+            write!(f, "{}", self.to_uci())
+        }
     }
 }
 
 impl fmt::Debug for Move {
+    /// Debug formatting will call the [`fmt::Display`] implementation
+    /// (taking into account the alternate formatter, if provided)
+    /// and will also debug print the [`MoveKind`].
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} ({:?})", self.to_uci(), self.kind())
+        if f.alternate() {
+            write!(f, "{self:#} ({:?})", self.kind())
+        } else {
+            write!(f, "{self} ({:?})", self.kind())
+        }
     }
 }
 

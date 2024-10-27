@@ -4,6 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+use anyhow::Result;
 use chessie::{perft, Game};
 
 fn test_perft_fen_nodes(depth: usize, fen: &str, expected: u64) {
@@ -12,9 +13,8 @@ fn test_perft_fen_nodes(depth: usize, fen: &str, expected: u64) {
     assert_eq!(res, expected);
 }
 
-#[test]
-fn test_standard_epd() {
-    let contents = std::fs::read_to_string("tests/standard.epd").unwrap();
+fn test_epd(epd_file: &str, max_depth: usize) -> Result<()> {
+    let contents = std::fs::read_to_string(epd_file)?;
 
     for (i, entry) in contents.lines().enumerate() {
         let mut parts = entry.split(';');
@@ -22,10 +22,13 @@ fn test_standard_epd() {
         let fen = parts.next().unwrap().trim();
 
         for perft_data in parts {
-            let depth = usize::from_str_radix(perft_data.get(1..2).unwrap().trim(), 10).unwrap();
-            let expected = u64::from_str_radix(perft_data.get(3..).unwrap().trim(), 10).unwrap();
+            let depth = usize::from_str_radix(perft_data.get(1..2).unwrap().trim(), 10)?;
+            if depth > max_depth {
+                break;
+            }
+            let expected = u64::from_str_radix(perft_data.get(3..).unwrap().trim(), 10)?;
 
-            let mut position = Game::from_fen(fen).unwrap();
+            let mut position = Game::from_fen(fen)?;
 
             let nodes = perft(&mut position, depth);
 
@@ -35,6 +38,19 @@ fn test_standard_epd() {
             );
         }
     }
+
+    Ok(())
+}
+
+#[test]
+fn test_standard_epd() {
+    test_epd("tests/standard.epd", 6).unwrap();
+}
+
+#[test]
+fn test_fischer_epd() {
+    // Depth 6 takes a *very* long time
+    test_epd("tests/fischer.epd", 5).unwrap();
 }
 
 #[cfg(test)]
@@ -184,5 +200,14 @@ mod special_perfts {
     #[test]
     fn test_special_perft_stalemate_and_checkmate_2() {
         test_perft_fen_nodes(4, "8/8/2k5/5q2/5n2/8/5K2/8 b - - 0 1", 23527);
+    }
+
+    #[test]
+    fn test_cannot_castle_when_rook_pinned() {
+        test_perft_fen_nodes(
+            1,
+            "Qr2kqbr/2bpp1pp/pn3p2/2p5/6P1/P1PP4/1P2PP1P/NRNBK1BR b HBhb - 0 9",
+            34,
+        );
     }
 }

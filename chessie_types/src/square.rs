@@ -224,6 +224,54 @@ impl Square {
         Self(bits)
     }
 
+    /// Returns the destination of the King after performing a short ("kingside") castle by the supplied [`Color`].
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie_types::{Color, Square};
+    /// assert_eq!(Square::king_short_castle(Color::White), Square::G1);
+    /// assert_eq!(Square::king_short_castle(Color::Black), Square::G8);
+    /// ```
+    pub const fn king_short_castle(color: Color) -> Self {
+        Self::G1.rank_relative_to(color)
+    }
+
+    /// Returns the destination of the King after performing a long ("queenside") castle by the supplied [`Color`].
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie_types::{Color, Square};
+    /// assert_eq!(Square::king_long_castle(Color::White), Square::C1);
+    /// assert_eq!(Square::king_long_castle(Color::Black), Square::C8);
+    /// ```
+    pub const fn king_long_castle(color: Color) -> Self {
+        Self::C1.rank_relative_to(color)
+    }
+
+    /// Returns the destination of the Rook after performing a short ("kingside") castle by the supplied [`Color`].
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie_types::{Color, Square};
+    /// assert_eq!(Square::rook_short_castle(Color::White), Square::F1);
+    /// assert_eq!(Square::rook_short_castle(Color::Black), Square::F8);
+    /// ```
+    pub const fn rook_short_castle(color: Color) -> Self {
+        Self::F1.rank_relative_to(color)
+    }
+
+    /// Returns the destination of the Rook after performing a long ("queenside") castle by the supplied [`Color`].
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie_types::{Color, Square};
+    /// assert_eq!(Square::rook_long_castle(Color::White), Square::D1);
+    /// assert_eq!(Square::rook_long_castle(Color::Black), Square::D8);
+    /// ```
+    pub const fn rook_long_castle(color: Color) -> Self {
+        Self::D1.rank_relative_to(color)
+    }
+
     /// Flips this [`Square`], as if the board was rotated 180 degrees.
     ///
     /// This is equivalent to calling [`Square::flipped_rank`] and [`Square::flipped_file`]

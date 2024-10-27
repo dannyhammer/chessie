@@ -19,33 +19,16 @@ use super::{
 /// Represents the castling rights of a single player
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Default)]
 pub struct CastlingRights {
-    /// If a right is `Some(file)`, then `file` is the *rook*'s location
+    /// If a right is `Some(file)`, then `file` is the *Rook*'s location
     pub(crate) short: Option<File>,
     pub(crate) long: Option<File>,
 }
 
 impl CastlingRights {
-    /// Creates a new [`CastlingRights`] that permits castling to the provided sides.
+    /// Creates a new [`CastlingRights`] that permits castling with a Rook on the provided files.
     #[inline(always)]
     pub const fn new(short: Option<File>, long: Option<File>) -> Self {
         Self { short, long }
-    }
-
-    /// Creates a new [`CastlingRights`] from part of a FEN string.
-    ///
-    /// # Example
-    /// ```
-    /// # use chessie::*;
-    /// let rights = CastlingRights::new(Some(File::H), Some(File::A));
-    ///
-    /// assert_eq!(CastlingRights::from_uci("KQ").unwrap(), rights);
-    /// assert_eq!(CastlingRights::from_uci("kq").unwrap(), rights);
-    /// ```
-    pub fn from_uci(uci: &str) -> Result<Self> {
-        let short = uci.contains(['K', 'k']).then_some(File::H);
-        let long = uci.contains(['Q', 'q']).then_some(File::A);
-
-        Ok(Self::new(short, long))
     }
 
     /// Creates a `usize` for indexing into lists of 4 elements.
@@ -57,16 +40,10 @@ impl CastlingRights {
     }
 }
 
-impl FromStr for CastlingRights {
-    type Err = anyhow::Error;
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Self::from_uci(s)
-    }
-}
-
 /// Represents the current state of the game, including move counters.
 ///
-/// Analogous to a FEN string.
+/// This is analogous to a FEN string, and possesses no way to move pieces on the board.
+/// If you are looking for a type to include in an engine, use [`crate::Game`].
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Position {
     /// Bitboard representation of the game board.
@@ -114,14 +91,14 @@ impl Position {
     pub fn new() -> Self {
         let board = Board::new();
         let castling_rights = [CastlingRights::default(); Color::COUNT];
-        let current_player = Color::White;
+        let side_to_move = Color::White;
         let ep_square = None;
 
-        let key = ZobristKey::from_parts(&board, ep_square, &castling_rights, current_player);
+        let key = ZobristKey::from_parts(&board, ep_square, &castling_rights, side_to_move);
 
         Self {
             board,
-            side_to_move: current_player,
+            side_to_move,
             castling_rights,
             ep_square,
             halfmove: 0,
@@ -143,31 +120,24 @@ impl Position {
         pos.side_to_move = Color::from_str(active_color)?;
 
         // Castling is a bit more complicated; especially for Chess960
-        let castling = split.next().unwrap_or("KQkq");
+        let castling = split.next().unwrap_or("-");
         if castling.contains(['K', 'k', 'Q', 'q']) {
             pos.castling_rights[Color::White].short = castling.contains('K').then_some(File::H);
             pos.castling_rights[Color::White].long = castling.contains('Q').then_some(File::A);
             pos.castling_rights[Color::Black].short = castling.contains('k').then_some(File::H);
             pos.castling_rights[Color::Black].long = castling.contains('q').then_some(File::A);
         } else if castling.chars().any(|c| File::from_char(c).is_ok()) {
-            eprintln!("Warning: Chess960 FEN detected for castling rights: {castling:?}");
-            eprintln!("Chess960 is not currently supported");
-            /*
-            // TODO: Support Chess960
-            for c in uci.chars() {
+            for c in castling.chars() {
                 let color = Color::from_bool(c.is_ascii_lowercase());
-                let file = File::from_char(c)?;
-                let rank = Rank::first(color);
-                let rook_square = Square::new(file, rank);
+                let rook_file = File::from_char(c)?;
 
-                let king_file = File::E; // TODO: Fetch King's file the rest of the FEN
-                if file > king_file {
-                    short[color] = Some(rook_square);
+                let king_file = pos.board.king(color).to_square_unchecked().file();
+                if rook_file > king_file {
+                    pos.castling_rights[color].short = Some(rook_file);
                 } else {
-                    long[color] = Some(rook_square);
+                    pos.castling_rights[color].long = Some(rook_file);
                 }
             }
-             */
         }
 
         let en_passant_target = split.next().unwrap_or("-");
@@ -191,6 +161,82 @@ impl Position {
         Ok(pos)
     }
 
+    /// Converts a [Scharnagl Number](https://en.wikipedia.org/wiki/Fischer_random_chess_numbering_scheme#Direct_derivation) to a Chess960 starting position.
+    ///
+    /// # Panics
+    ///
+    /// If `n >= 960`, as there are only 960 valid starting positions.
+    ///
+    /// # Examples
+    /// ```
+    /// # use chessie::*;
+    /// // 518 is the Scharnagl number for startpos
+    /// let startpos = Position::from_frc(518);
+    /// assert_eq!(startpos, Position::from_fen(FEN_STARTPOS).unwrap());
+    /// ```
+    pub fn from_frc(n: usize) -> Self {
+        Self::from_dfrc(n, n)
+    }
+
+    /// Converts a pair of [Scharnagl Numbers](https://en.wikipedia.org/wiki/Fischer_random_chess_numbering_scheme#Direct_derivation) to a Double Fischer Random Chess starting position.
+    ///
+    /// # Panics
+    ///
+    /// If either Scharnagl number `>= 960`, as there are only 960 valid starting positions.
+    pub fn from_dfrc(white_scharnagl: usize, black_scharnagl: usize) -> Self {
+        // Fetch the starting arrangement
+        let start_positions = if white_scharnagl != black_scharnagl {
+            [
+                Self::scharnagl_to_placements(white_scharnagl),
+                Self::scharnagl_to_placements(black_scharnagl),
+            ]
+        } else {
+            // Small time saver to avoid re-computing if the numbers are equal
+            [Self::scharnagl_to_placements(white_scharnagl); 2]
+        };
+
+        // Actually place the pieces
+        let mut pos = Self::new();
+        for color in Color::all() {
+            for (file, kind) in start_positions[color]
+                .into_iter()
+                .enumerate()
+                .map(|(f, kind)| (File::new_unchecked(f as u8), kind))
+            {
+                // Place the piece
+                let piece = Piece::new(color, kind);
+                pos.place(piece, Square::new(file, Rank::first(color)));
+
+                // Place the Pawn
+                let pawn = Piece::new(color, PieceKind::Pawn);
+                pos.place(pawn, Square::new(file, Rank::second(color)));
+            }
+
+            // Assign castling rights
+            for file in File::iter() {
+                let square = Square::new(file, Rank::ONE);
+                if let Some(PieceKind::Rook) = pos.kind_at(square) {
+                    pos.castling_rights[color].long = Some(file);
+                    break;
+                }
+            }
+
+            // There's probably a way to do this in a single loop, but this works, too.
+            for file in File::iter().rev() {
+                let square = Square::new(file, Rank::ONE);
+                if let Some(PieceKind::Rook) = pos.kind_at(square) {
+                    pos.castling_rights[color].short = Some(file);
+                    break;
+                }
+            }
+        }
+
+        // Make sure to update the Zobrist key
+        pos.key = ZobristKey::new(&pos);
+
+        pos
+    }
+
     /// Copies `self` and returns a [`Position`] after having applied the provided [`Move`].
     #[inline(always)]
     pub fn with_move_made(&self, mv: Move) -> Self {
@@ -200,22 +246,27 @@ impl Position {
     }
 
     /// Generates a FEN string from this [`Position`].
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie::Position;
+    /// let state = Position::default();
+    /// assert_eq!(state.to_fen(), "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    /// ```
     pub fn to_fen(&self) -> String {
-        let placements = self.board().to_fen();
-        let active_color = self.side_to_move();
+        format!("{self}")
+    }
 
-        let castling = self.castling_rights_uci();
-
-        let en_passant_target = if let Some(square) = self.ep_square {
-            square.to_string()
-        } else {
-            String::from("-")
-        };
-
-        let halfmove = self.halfmove;
-        let fullmove = self.fullmove;
-
-        format!("{placements} {active_color} {castling} {en_passant_target} {halfmove} {fullmove}")
+    /// Generates a FEN string from this [`Position`] with castling rights in Chess960 format.
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie::Position;
+    /// let state = Position::default();
+    /// assert_eq!(state.to_960_fen(), "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w HAha - 0 1");
+    /// ```
+    pub fn to_960_fen(&self) -> String {
+        format!("{self:#}")
     }
 
     /// Returns the current player as a [`Color`].
@@ -249,9 +300,8 @@ impl Position {
         &self.castling_rights[color.index()]
     }
 
-    /// Returns the [`CastlingRights`] of the current position.
+    /// Returns the [`CastlingRights`] of the current position in standard UCI notation.
     pub fn castling_rights_uci(&self) -> String {
-        // Castling rights done individually
         let mut castling = String::with_capacity(4);
 
         if self.castling_rights()[Color::White].short.is_some() {
@@ -265,6 +315,33 @@ impl Position {
         }
         if self.castling_rights()[Color::Black].long.is_some() {
             castling.push('q');
+        }
+
+        // If no side can castle, use a hyphen
+        if castling.is_empty() {
+            castling = String::from("-");
+        }
+        castling
+    }
+
+    /// Returns the [`CastlingRights`] of the current position in Chess960 notation.
+    pub fn castling_rights_960(&self) -> String {
+        let mut castling = String::with_capacity(4);
+
+        if let Some(file) = self.castling_rights()[Color::White].short {
+            castling.push(file.char().to_ascii_uppercase());
+        }
+
+        if let Some(file) = self.castling_rights()[Color::White].long {
+            castling.push(file.char().to_ascii_uppercase());
+        }
+
+        if let Some(file) = self.castling_rights()[Color::Black].short {
+            castling.push(file.char());
+        }
+
+        if let Some(file) = self.castling_rights()[Color::Black].long {
+            castling.push(file.char());
         }
 
         // If no side can castle, use a hyphen
@@ -482,7 +559,7 @@ impl Position {
         };
 
         let color = piece.color();
-        let to = mv.to();
+        let mut to = mv.to();
         let from = mv.from();
 
         // Un-hash the side-to-move
@@ -500,30 +577,30 @@ impl Position {
         // First, deal with special cases like captures and castling
         if mv.is_capture() {
             // If this move was en passant, the piece we captured isn't at `to`, it's one square behind
-            let captured_square = if mv.is_en_passant() {
+            let victim_square = if mv.is_en_passant() {
                 to.backward_by(color, 1).unwrap()
             } else {
                 to
             };
 
-            let Some(captured) = self.take(captured_square) else {
-                panic!("Failed to apply {mv:?} to {self}: No piece found at {captured_square}");
+            let Some(victim) = self.take(victim_square) else {
+                panic!("Failed to apply {mv:?} to {self}: No piece found at {victim_square}");
             };
-            let captured_color = captured.color();
+            let victim_color = victim.color();
 
             // If the capture was on a rook's starting square, disable that side's castling.
-            if to.rank() == Rank::first(captured_color) {
-                // Either a rook was captured, or there wasn't a rook there, in which case castling on that side is already disabled
-                if self.castling_rights[captured_color]
+            if to.rank() == Rank::first(victim_color) {
+                // Either a rook was victim, or there wasn't a rook there, in which case castling on that side is already disabled
+                if self.castling_rights[victim_color]
                     .long
                     .is_some_and(|file| to.file() == file)
                 {
-                    self.clear_long_castling_rights(captured_color);
-                } else if self.castling_rights[captured_color]
+                    self.clear_long_castling_rights(victim_color);
+                } else if self.castling_rights[victim_color]
                     .short
                     .is_some_and(|file| to.file() == file)
                 {
-                    self.clear_short_castling_rights(captured_color);
+                    self.clear_short_castling_rights(victim_color);
                 }
             }
 
@@ -534,14 +611,26 @@ impl Position {
             self.ep_square = from.forward_by(color, 1);
             self.key.hash_optional_ep_square(self.ep_square());
         } else if mv.is_castle() {
-            // TODO: Chess960
-            let castle_index = mv.is_short_castle() as usize;
-            let old_rook_square = [Square::A1, Square::H1][castle_index].rank_relative_to(color);
-            let new_rook_square = [Square::D1, Square::F1][castle_index].rank_relative_to(color);
+            // Get the destination squares for the King and Rook
+            let (new_rook_square, new_king_square) = if mv.is_short_castle() {
+                (
+                    Square::rook_short_castle(color),
+                    Square::king_short_castle(color),
+                )
+            } else {
+                (
+                    Square::rook_long_castle(color),
+                    Square::king_long_castle(color),
+                )
+            };
 
-            // Move the rook. The King is already handled before and after this match statement.
-            let rook = self.take(old_rook_square).unwrap();
-            self.place(rook, new_rook_square);
+            // Move the rook. Moving the King is already handled before and after this if-else chain
+            if let Some(rook) = self.take(to) {
+                self.place(rook, new_rook_square);
+            }
+
+            // The King doesn't actually move to the Rook, so update the destination square
+            to = new_king_square;
 
             // Disable castling
             self.clear_castling_rights(color);
@@ -627,6 +716,96 @@ impl Position {
         self.castling_rights[color].long = None;
         self.key.hash_castling_rights(&self.castling_rights);
     }
+
+    /// Internal function to convert a [Scharnagl Number](https://en.wikipedia.org/wiki/Fischer_random_chess_numbering_scheme#Direct_derivation) to a Chess960 starting position.
+    ///
+    /// This function returns an array of [`PieceKind`]s in the order they should be placed in White's home rank.
+    ///
+    /// # Panics
+    /// If `n >= 960`, as there are only 960 valid starting positions.
+    fn scharnagl_to_placements(n: usize) -> [PieceKind; File::COUNT] {
+        assert!(n < 960, "Must be [0, 960)");
+
+        // Start with Pawns and replace them as we go
+        let mut startpos = [PieceKind::Pawn; File::COUNT];
+
+        // Divide N by 4, yielding quotient N2 and remainder B1.
+        // Place a Bishop upon the bright square corresponding to B1 (0=b, 1=d, 2=f, 3=h).
+        let (n2, b1) = (n / 4, n % 4);
+        startpos[1 + b1 * 2] = PieceKind::Bishop;
+
+        // Divide N2 by 4 again, yielding quotient N3 and remainder B2.
+        // Place a second Bishop upon the dark square corresponding to B2 (0=a, 1=c, 2=e, 3=g).
+        let (n3, b2) = (n2 / 4, n2 % 4);
+        startpos[b2 * 2] = PieceKind::Bishop;
+
+        // Divide N3 by 6, yielding quotient N4 and remainder Q.
+        // Place the Queen according to Q, where 0 is the first free square starting from a, 1 is the second, etc.
+        let (n4, q) = (n3 / 6, n3 % 6);
+        let mut num_empty = 0;
+        for kind in &mut startpos {
+            if matches!(kind, PieceKind::Pawn) {
+                if num_empty == q {
+                    *kind = PieceKind::Queen;
+                }
+                num_empty += 1;
+            }
+        }
+
+        //  N4 will be a single digit, 0 ... 9.
+        // Ignoring Bishops and Queen, find the positions of two Knights within the remaining five spaces.
+        // Place the Knights according to its value by consulting the following N5N table:
+        let (kn1, kn2) = match n4 {
+            0 => (0, 0),
+            1 => (0, 1),
+            2 => (0, 2),
+            3 => (0, 3),
+            4 => (1, 0),
+            5 => (1, 1),
+            6 => (1, 2),
+            7 => (2, 0),
+            8 => (2, 1),
+            9 => (3, 0),
+            _ => unreachable!(),
+        };
+
+        let mut num_empty = 0;
+        let mut first_knight = 0;
+        for (i, kind) in startpos.iter_mut().enumerate() {
+            if matches!(kind, PieceKind::Pawn) {
+                if num_empty == kn1 {
+                    *kind = PieceKind::Knight;
+                    first_knight = i;
+                    num_empty = 0;
+                    break;
+                }
+                num_empty += 1;
+            }
+        }
+
+        // Now for the second Knight
+        for kind in startpos.iter_mut().skip(first_knight) {
+            if matches!(kind, PieceKind::Pawn) {
+                if num_empty == kn2 {
+                    *kind = PieceKind::Knight;
+                    break;
+                }
+                num_empty += 1;
+            }
+        }
+
+        // There are three blank squares remaining; place a Rook in each of the outer two and the King in the middle one.
+        let remaining = [PieceKind::Rook, PieceKind::King, PieceKind::Rook];
+        let mut j = 0;
+        for kind in &mut startpos {
+            if matches!(kind, PieceKind::Pawn) {
+                *kind = remaining[j];
+                j += 1;
+            }
+        }
+
+        startpos
+    }
 }
 
 impl FromStr for Position {
@@ -653,9 +832,32 @@ impl Default for Position {
 }
 
 impl fmt::Display for Position {
-    /// Display this position's FEN string
+    /// Display this position's FEN string.
+    ///
+    /// If the alternate format mode (`#`) was specified, this will print the castling rights in Chess960 format.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_fen())
+        let placements = self.board().to_fen();
+        let active_color = self.side_to_move();
+
+        let castling = if f.alternate() {
+            self.castling_rights_960()
+        } else {
+            self.castling_rights_uci()
+        };
+
+        let en_passant_target = if let Some(square) = self.ep_square {
+            square.to_string()
+        } else {
+            String::from("-")
+        };
+
+        let halfmove = self.halfmove;
+        let fullmove = self.fullmove;
+
+        write!(
+            f,
+            "{placements} {active_color} {castling} {en_passant_target} {halfmove} {fullmove}"
+        )
     }
 }
 
