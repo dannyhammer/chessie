@@ -88,6 +88,7 @@ impl Position {
     /// let state = Position::new();
     /// assert_eq!(state.to_fen(), "8/8/8/8/8/8/8/8 w - - 0 1");
     /// ```
+    #[inline(always)]
     pub fn new() -> Self {
         let board = Board::new();
         let castling_rights = [CastlingRights::default(); Color::COUNT];
@@ -174,6 +175,7 @@ impl Position {
     /// let startpos = Position::from_960(518);
     /// assert_eq!(startpos, Position::from_fen(FEN_STARTPOS).unwrap());
     /// ```
+    #[inline(always)]
     pub fn from_960(n: usize) -> Self {
         Self::from_d960(n, n)
     }
@@ -580,7 +582,8 @@ impl Position {
         if mv.is_capture() {
             // If this move was en passant, the piece we captured isn't at `to`, it's one square behind
             let victim_square = if mv.is_en_passant() {
-                to.backward_by(color, 1).unwrap()
+                // Safety: En passant cannot occur on the first or eighth, so this is guaranteed to have a square behind it.
+                unsafe { to.backward_by(color, 1).unwrap_unchecked() }
             } else {
                 to
             };
@@ -808,6 +811,7 @@ impl Position {
 
 impl FromStr for Position {
     type Err = anyhow::Error;
+    #[inline(always)]
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         Self::from_fen(s)
     }
@@ -824,8 +828,8 @@ impl Deref for Position {
 impl Default for Position {
     #[inline(always)]
     fn default() -> Self {
-        // Safe unwrap because the FEN for startpos is always valid
-        Self::from_fen(FEN_STARTPOS).unwrap()
+        // Safety: The FEN for startpos is always valid
+        unsafe { Self::from_fen(FEN_STARTPOS).unwrap_unchecked() }
     }
 }
 
@@ -1154,9 +1158,11 @@ impl Board {
 
     /// Fetches the [`Piece`] of the piece at the provided [`Square`], without checking if one is there.
     ///
-    /// This is an internal function, and should never be called unless you know what you're doing (hint: you probably don't).
+    /// The primary use case of this function is to get the piece at a [`Move`]'s `to` field.
+    ///
+    /// It is undefined behavior to call this function on a square that has no piece.
     #[inline(always)]
-    pub(crate) fn piece_at_unchecked(&self, square: Square) -> Piece {
+    pub fn piece_at_unchecked(&self, square: Square) -> Piece {
         unsafe { self.piece_at(square).unwrap_unchecked() }
     }
 
@@ -1348,8 +1354,8 @@ impl Board {
 impl Default for Board {
     #[inline(always)]
     fn default() -> Self {
-        // Safe unwrap because the FEN for startpos is always valid
-        Self::from_fen(FEN_STARTPOS).unwrap()
+        // Safety: The FEN for startpos is always valid
+        unsafe { Self::from_fen(FEN_STARTPOS).unwrap_unchecked() }
     }
 }
 

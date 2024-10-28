@@ -143,6 +143,7 @@ impl<'a> MoveGenIter<'a> {
     ///
     /// Note that if the position is currently in double check, the provided mask will have no effect,
     /// as only the King is allowed to move during a double check.
+    #[inline(always)]
     pub fn only_moves_from(mut self, mask: impl Into<Bitboard>) -> Self {
         // If in double check, we cannot generate moves for anything other than the King
         self.from_mask = if self.game.is_in_double_check() {

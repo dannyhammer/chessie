@@ -517,6 +517,7 @@ impl Move {
     /// let e1g1 = Move::new(Square::E1, Square::G1, MoveKind::ShortCastle);
     /// assert_eq!(e1g1.to_uci(), "e1g1")
     /// ```
+    #[inline(always)]
     pub fn to_uci(&self) -> String {
         // Since castling is encoded internally as KxR, we need to adjust them for UCI notation
         let mv = self.into_standard_castle();
@@ -555,6 +556,7 @@ impl fmt::Display for Move {
     /// A [`Move`] is displayed in its UCI format.
     ///
     /// If the alternate format mode (`#`) was specified, this will print the castling moves in Chess960 notation.
+    #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if f.alternate() {
             if let Some(promote) = self.promotion() {
@@ -572,6 +574,7 @@ impl fmt::Debug for Move {
     /// Debug formatting will call the [`fmt::Display`] implementation
     /// (taking into account the alternate formatter, if provided)
     /// and will also display it's [`MoveKind`] in a human-readable format.
+    #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if f.alternate() {
             write!(f, "{self:#} ({})", self.kind())

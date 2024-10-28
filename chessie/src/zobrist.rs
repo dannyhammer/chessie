@@ -42,6 +42,7 @@ impl ZobristKey {
     }
 
     /// Generates a [`ZobristKey`] from the provided components of a [`Position`].
+    #[inline(always)]
     pub fn from_parts(
         board: &Board,
         ep_square: Option<Square>,
@@ -217,6 +218,7 @@ impl ZobristKey {
 }
 
 impl fmt::Display for ZobristKey {
+    #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }

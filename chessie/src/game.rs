@@ -53,6 +53,7 @@ pub struct Game {
 
 impl Game {
     /// Creates a new [`Game`] from  the provided [`Position`].
+    #[inline(always)]
     pub fn new(position: Position) -> Self {
         /*
         // Compute attack/defend maps by square and color
@@ -455,77 +456,6 @@ impl Game {
         }
     }
 
-    /// Generates and serializes all legal Knight moves.
-    fn generate_knight_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
-        let color = self.side_to_move();
-        for from in self.knights(color) & mask {
-            let attacks = knight_attacks(from);
-            let mobility = self.generate_legal_normal_piece_mobility::<IN_CHECK>(from, attacks);
-
-            for to in mobility {
-                self.serialize_normal_move(to, from, moves);
-            }
-        }
-    }
-
-    /// Generates and serializes all legal Bishop moves.
-    fn generate_bishop_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
-        let color = self.side_to_move();
-        let blockers = self.occupied();
-        for from in self.diagonal_sliders(color) & mask {
-            let attacks = bishop_attacks(from, blockers);
-            let mobility = self.generate_legal_normal_piece_mobility::<IN_CHECK>(from, attacks);
-
-            for to in mobility {
-                self.serialize_normal_move(to, from, moves);
-            }
-        }
-    }
-
-    /// Generates and serializes all legal Rook moves.
-    fn generate_rook_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
-        let color = self.side_to_move();
-        let blockers = self.occupied();
-        for from in self.orthogonal_sliders(color) & mask {
-            let attacks = rook_attacks(from, blockers);
-            let mobility = self.generate_legal_normal_piece_mobility::<IN_CHECK>(from, attacks);
-
-            for to in mobility {
-                self.serialize_normal_move(to, from, moves);
-            }
-        }
-    }
-
-    /// Generates and serializes all legal King moves.
-    fn generate_king_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
-        // If the mask doesn't contain the King, then don't generate the King's moves
-        if mask.is_disjoint(self.king_square) {
-            return;
-        }
-
-        let from = self.king_square;
-        let color = self.side_to_move();
-        for to in self.generate_legal_king_mobility::<IN_CHECK>(color, from) {
-            let kind = if let Some(victim) = self.piece_at(to) {
-                // If the victim is friendly, this is a castling move (KxR).
-                if victim.color() == color {
-                    if to.file() > from.file() {
-                        MoveKind::ShortCastle
-                    } else {
-                        MoveKind::LongCastle
-                    }
-                } else {
-                    MoveKind::Capture
-                }
-            } else {
-                MoveKind::Quiet
-            };
-
-            let mv = Move::new(from, to, kind);
-            moves.push(mv);
-        }
-    }
-
     /*
     // TODO: https://github.com/dannyhammer/brogle/issues/9
     fn compute_pawn_moves(
@@ -608,7 +538,78 @@ impl Game {
             }
         }
     }
-     */
+    */
+
+    /// Generates and serializes all legal Knight moves.
+    fn generate_knight_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
+        let color = self.side_to_move();
+        for from in self.knights(color) & mask {
+            let attacks = knight_attacks(from);
+            let mobility = self.generate_legal_normal_piece_mobility::<IN_CHECK>(from, attacks);
+
+            for to in mobility {
+                self.serialize_normal_move(to, from, moves);
+            }
+        }
+    }
+
+    /// Generates and serializes all legal Bishop moves.
+    fn generate_bishop_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
+        let color = self.side_to_move();
+        let blockers = self.occupied();
+        for from in self.diagonal_sliders(color) & mask {
+            let attacks = bishop_attacks(from, blockers);
+            let mobility = self.generate_legal_normal_piece_mobility::<IN_CHECK>(from, attacks);
+
+            for to in mobility {
+                self.serialize_normal_move(to, from, moves);
+            }
+        }
+    }
+
+    /// Generates and serializes all legal Rook moves.
+    fn generate_rook_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
+        let color = self.side_to_move();
+        let blockers = self.occupied();
+        for from in self.orthogonal_sliders(color) & mask {
+            let attacks = rook_attacks(from, blockers);
+            let mobility = self.generate_legal_normal_piece_mobility::<IN_CHECK>(from, attacks);
+
+            for to in mobility {
+                self.serialize_normal_move(to, from, moves);
+            }
+        }
+    }
+
+    /// Generates and serializes all legal King moves.
+    fn generate_king_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
+        // If the mask doesn't contain the King, then don't generate the King's moves
+        if mask.is_disjoint(self.king_square) {
+            return;
+        }
+
+        let from = self.king_square;
+        let color = self.side_to_move();
+        for to in self.generate_legal_king_mobility::<IN_CHECK>(color, from) {
+            let kind = if let Some(victim) = self.piece_at(to) {
+                // If the victim is friendly, this is a castling move (KxR).
+                if victim.color() == color {
+                    if to.file() > from.file() {
+                        MoveKind::ShortCastle
+                    } else {
+                        MoveKind::LongCastle
+                    }
+                } else {
+                    MoveKind::Capture
+                }
+            } else {
+                MoveKind::Quiet
+            };
+
+            let mv = Move::new(from, to, kind);
+            moves.push(mv);
+        }
+    }
 
     /// Returns `true` if the side-to-move is currently in check.
     #[inline(always)]
@@ -690,6 +691,7 @@ impl Game {
     ///
     /// If en passant is legal, the returned bitboard will have a single bit set, representing a legal capture for the Pawn at `square`.
     /// If en passant is not legal, the returned bitboard will be empty.
+    #[inline(always)]
     fn generate_ep_bitboard(&self, color: Color, square: Square, ep_square: Square) -> Bitboard {
         // If this Pawn isn't on an adjacent file and the same rank as the enemy Pawn that caused en passant to be possible, it can't perform en passant
         if square.distance_ranks(ep_square) != 1 || square.distance_files(ep_square) != 1 {
