@@ -42,7 +42,7 @@ pub struct Game {
     pinned: Bitboard,
 
     /// All squares (pseudo-legally) attacked by a specific color.
-    // attacks_by_color: [Bitboard; Color::COUNT],
+    attacks_by_color: [Bitboard; Color::COUNT],
 
     /// Pseudo-legal attacks from every given square on the board.
     // attacks_by_square: [Bitboard; Square::COUNT],
@@ -76,7 +76,7 @@ impl Game {
             checkers: Bitboard::EMPTY_BOARD,
             checkmask: Bitboard::EMPTY_BOARD,
             pinned: Bitboard::EMPTY_BOARD,
-            // attacks_by_color,
+            attacks_by_color: [Bitboard::EMPTY_BOARD; Color::COUNT],
             // attacks_by_square,
             king_square: Square::default(),
         };
@@ -183,6 +183,24 @@ impl Game {
         Ok(())
     }
 
+    /// Returns `true` if the side-to-move is currently in check.
+    #[inline(always)]
+    pub const fn is_in_check(&self) -> bool {
+        self.checkers.population() > 0
+    }
+
+    /// Returns `true` if the side-to-move is currently in double check (in check by more than one piece).
+    #[inline(always)]
+    pub const fn is_in_double_check(&self) -> bool {
+        self.checkers.population() > 1
+    }
+
+    /// Returns a [`Bitboard`] of all squares attacked by `color`.
+    #[inline(always)]
+    pub const fn attacks_by_color(&self, color: Color) -> Bitboard {
+        self.attacks_by_color[color.index()]
+    }
+
     /// Recomputes legal metadata (checkers, checkmask, pinmask, etc.).
     #[inline(always)]
     fn recompute_legal_masks(&mut self) {
@@ -234,6 +252,11 @@ impl Game {
             for checker in self.checkers {
                 self.checkmask |= ray_between(self.king_square, checker);
             }
+        }
+
+        // Recompute attack/defend maps
+        for color in Color::all() {
+            self.attacks_by_color[color] = compute_attacks_by(self.board(), color);
         }
     }
 
@@ -394,14 +417,6 @@ impl Game {
         self.generate_king_moves::<IN_CHECK>(mask, moves);
     }
 
-    // fn generate_pawn_moves<const IN_CHECK: bool>(&self, moves: &mut MoveList) {
-    //     let color = self.side_to_move();
-
-    //     // Any pawn can push forward once, so long as there's nothing blocking it & it's not horizontally pinned
-    //     let pawns_that_can_push = self.pawns(color);
-    //     let single_pushes = pawns_that_can_push.advance_by(color, 1);
-    // }
-
     /// Creates and appends a [`Move`] that is either a quiet or capture.
     #[inline(always)]
     fn serialize_normal_move(&self, to: Square, from: Square, moves: &mut MoveList) {
@@ -456,6 +471,13 @@ impl Game {
         }
     }
 
+    // fn generate_pawn_moves<const IN_CHECK: bool>(&self, moves: &mut MoveList) {
+    //     let color = self.side_to_move();
+
+    //     // Any pawn can push forward once, so long as there's nothing blocking it & it's not horizontally pinned
+    //     let pawns_that_can_push = self.pawns(color);
+    //     let single_pushes = pawns_that_can_push.advance_by(color, 1);
+    // }
     /*
     // TODO: https://github.com/dannyhammer/brogle/issues/9
     fn compute_pawn_moves(
@@ -611,18 +633,6 @@ impl Game {
         }
     }
 
-    /// Returns `true` if the side-to-move is currently in check.
-    #[inline(always)]
-    pub const fn is_in_check(&self) -> bool {
-        self.checkers.population() > 0
-    }
-
-    /// Returns `true` if the side-to-move is currently in double check (in check by more than one piece).
-    #[inline(always)]
-    pub const fn is_in_double_check(&self) -> bool {
-        self.checkers.population() > 1
-    }
-
     /// Generates a [`Bitboard`] of all legal moves for `piece` at `square`.
     pub(crate) fn generate_legal_mobility_for<const IN_CHECK: bool>(
         &self,
@@ -726,7 +736,7 @@ impl Game {
         square: Square,
     ) -> Bitboard {
         let attacks = king_attacks(square);
-        let enemy_attacks = compute_attacks_by(self, color.opponent());
+        let enemy_attacks = self.attacks_by_color(color.opponent());
 
         // If in check, we cannot castle- we can only attack with the default movement of the King.
         let castling = if IN_CHECK {
