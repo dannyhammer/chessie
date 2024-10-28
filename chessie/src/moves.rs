@@ -111,9 +111,6 @@ impl MoveKind {
         position: &Position,
         promotion: Option<PieceKind>,
     ) -> Self {
-        // Extract information about the piece being moved
-        let color = piece.color();
-
         // By default, it's either a quiet or a capture.
         let victim = position.piece_at(to);
         let mut kind = if victim.is_some() {
@@ -122,44 +119,40 @@ impl MoveKind {
             Self::Quiet
         };
 
-        // The MoveKind depends on what kind of piece is being moved and where
-        if piece.is_pawn() {
-            // If a promotion was provided, it's a promotion of some kind
-            if let Some(promotion) = promotion {
-                // If this move also captures, it's a capture-promote
-                if kind == Self::Capture {
-                    kind = Self::promotion_capture(promotion);
-                } else {
-                    kind = Self::promotion(promotion);
+        // Pawns and Kings have special movement cases
+        match piece.kind() {
+            // Pawns are... complicated
+            PieceKind::Pawn => {
+                // If a promotion was provided, it's a promotion of some kind
+                if let Some(promotion) = promotion {
+                    // If this move also captures, it's a capture-promote
+                    if kind == Self::Capture {
+                        kind = Self::promotion_capture(promotion);
+                    } else {
+                        kind = Self::promotion(promotion);
+                    }
+                } else
+                // If this pawn is moving to the en passant square, it's en passant
+                if Some(to) == position.ep_square() {
+                    kind = Self::EnPassantCapture;
+                } else
+                // If the Pawn is moving two ranks, it's a double push
+                if from.rank().abs_diff(to.rank()) == 2 {
+                    kind = Self::PawnDoublePush;
                 }
             }
-            // If this pawn is moving to the en passant square, it's en passant
-            else if Some(to) == position.ep_square() {
-                kind = Self::EnPassantCapture;
-            }
-            // If the Pawn is moving two ranks, it's a double push
-            else if from.rank().abs_diff(to.rank()) == 2 {
-                kind = Self::PawnDoublePush;
-            }
-        } else if piece.is_king() {
-            // Standard castling
-            if from == Square::E1.rank_relative_to(color) {
-                if to == Square::G1.rank_relative_to(color) {
-                    kind = Self::ShortCastle;
-                } else if to == Square::C1.rank_relative_to(color) {
-                    kind = Self::LongCastle;
-                }
-            } else
-            // Chess960 castling
-            if victim
-                .is_some_and(|victim| victim.color() == piece.color() && victim.is_rook())
-            {
+
+            // King moves are only special if castling
+            PieceKind::King if victim.is_some_and(|victim| victim.color() == piece.color()) => {
                 if to.file() > from.file() {
                     kind = Self::ShortCastle;
                 } else {
                     kind = Self::LongCastle;
                 }
             }
+
+            // All other pieces have no special moves
+            _ => {}
         }
 
         kind
@@ -257,7 +250,7 @@ impl Move {
     /// assert_eq!(e7e8n.to_string(), "e7e8n");
     /// ```
     #[inline(always)]
-    pub fn new(from: Square, to: Square, kind: MoveKind) -> Self {
+    pub const fn new(from: Square, to: Square, kind: MoveKind) -> Self {
         Self(kind as u16 | (to.inner() as u16) << Self::DST_BITS | from.inner() as u16)
     }
 
@@ -270,7 +263,7 @@ impl Move {
     /// assert_eq!(e2e3.to_string(), "e2e3");
     /// ```
     #[inline(always)]
-    pub fn new_quiet(from: Square, to: Square) -> Self {
+    pub const fn new_quiet(from: Square, to: Square) -> Self {
         Self::new(from, to, MoveKind::Quiet)
     }
 
@@ -497,7 +490,17 @@ impl Move {
         let promotion = uci.get(4..5).map(PieceKind::from_str).transpose()?;
 
         // The MoveKind depends on what kind of piece is being moved and where
-        let kind = MoveKind::new(piece, from, to, position, promotion);
+        let mut kind = MoveKind::new(piece, from, to, position, promotion);
+
+        // To potentially speed up `MoveKind::new`, we check for standard castling notation here, since it will only ever be important if we're parsing castling moves in standard notation.
+        let color = piece.color();
+        if from == Square::E1.rank_relative_to(color) {
+            if to == Square::G1.rank_relative_to(color) {
+                kind = MoveKind::ShortCastle;
+            } else if to == Square::C1.rank_relative_to(color) {
+                kind = MoveKind::LongCastle;
+            }
+        }
 
         Ok(Self::new(from, to, kind))
     }
@@ -568,12 +571,12 @@ impl fmt::Display for Move {
 impl fmt::Debug for Move {
     /// Debug formatting will call the [`fmt::Display`] implementation
     /// (taking into account the alternate formatter, if provided)
-    /// and will also debug print the [`MoveKind`].
+    /// and will also display it's [`MoveKind`] in a human-readable format.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if f.alternate() {
-            write!(f, "{self:#} ({:?})", self.kind())
+            write!(f, "{self:#} ({})", self.kind())
         } else {
-            write!(f, "{self} ({:?})", self.kind())
+            write!(f, "{self} ({})", self.kind())
         }
     }
 }
@@ -582,12 +585,14 @@ impl Default for Move {
     /// A "default" move is an illegal move. See [`Move::illegal`]
     ///
     /// This is mostly just to satisfy the compiler, and should never be used in a real scenario.
+    #[inline(always)]
     fn default() -> Self {
         Self::illegal()
     }
 }
 
 impl<T: AsRef<str>> PartialEq<T> for Move {
+    #[inline(always)]
     fn eq(&self, other: &T) -> bool {
         self.to_uci().eq(other.as_ref())
     }

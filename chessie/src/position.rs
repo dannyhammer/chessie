@@ -171,11 +171,11 @@ impl Position {
     /// ```
     /// # use chessie::*;
     /// // 518 is the Scharnagl number for startpos
-    /// let startpos = Position::from_frc(518);
+    /// let startpos = Position::from_960(518);
     /// assert_eq!(startpos, Position::from_fen(FEN_STARTPOS).unwrap());
     /// ```
-    pub fn from_frc(n: usize) -> Self {
-        Self::from_dfrc(n, n)
+    pub fn from_960(n: usize) -> Self {
+        Self::from_d960(n, n)
     }
 
     /// Converts a pair of [Scharnagl Numbers](https://en.wikipedia.org/wiki/Fischer_random_chess_numbering_scheme#Direct_derivation) to a Double Fischer Random Chess starting position.
@@ -183,7 +183,7 @@ impl Position {
     /// # Panics
     ///
     /// If either Scharnagl number `>= 960`, as there are only 960 valid starting positions.
-    pub fn from_dfrc(white_scharnagl: usize, black_scharnagl: usize) -> Self {
+    pub fn from_d960(white_scharnagl: usize, black_scharnagl: usize) -> Self {
         // Fetch the starting arrangement
         let start_positions = if white_scharnagl != black_scharnagl {
             [
@@ -465,6 +465,7 @@ impl Position {
     }
 
     /// Returns `true` if `color` can castle (either short or long).
+    #[inline(always)]
     pub const fn can_castle(&self, color: Color) -> bool {
         self.castling_rights()[color.index()].short.is_some()
             || self.castling_rights()[color.index()].long.is_some()
@@ -475,6 +476,7 @@ impl Position {
     /// Fullmove and Halfmove clocks are ignored.
     ///
     /// This does _not_ check the [`ZobristKey`] of each [`Position`].
+    #[inline(always)]
     pub fn is_same_as(&self, other: &Self) -> bool {
         self.side_to_move() == other.side_to_move()
             && self.ep_square() == other.ep_square()
@@ -610,27 +612,25 @@ impl Position {
             // Double pawn push, so set the EP square
             self.ep_square = from.forward_by(color, 1);
             self.key.hash_optional_ep_square(self.ep_square());
-        } else if mv.is_castle() {
-            // Get the destination squares for the King and Rook
-            let (new_rook_square, new_king_square) = if mv.is_short_castle() {
-                (
-                    Square::rook_short_castle(color),
-                    Square::king_short_castle(color),
-                )
-            } else {
-                (
-                    Square::rook_long_castle(color),
-                    Square::king_long_castle(color),
-                )
-            };
-
+        } else if mv.is_short_castle() {
             // Move the rook. Moving the King is already handled before and after this if-else chain
             if let Some(rook) = self.take(to) {
-                self.place(rook, new_rook_square);
+                self.place(rook, Square::rook_short_castle(color));
             }
 
             // The King doesn't actually move to the Rook, so update the destination square
-            to = new_king_square;
+            to = Square::king_short_castle(color);
+
+            // Disable castling
+            self.clear_castling_rights(color);
+        } else if mv.is_long_castle() {
+            // Move the rook. Moving the King is already handled before and after this if-else chain
+            if let Some(rook) = self.take(to) {
+                self.place(rook, Square::rook_long_castle(color));
+            }
+
+            // The King doesn't actually move to the Rook, so update the destination square
+            to = Square::king_long_castle(color);
 
             // Disable castling
             self.clear_castling_rights(color);
@@ -640,20 +640,18 @@ impl Position {
         match piece.kind() {
             PieceKind::Pawn => self.halfmove = 0,
 
+            // Disable castling if a rook moved for the first time
             PieceKind::Rook => {
-                // Disable castling if a rook moved
-                if from.rank() == Rank::first(color) {
-                    if self.castling_rights[color]
-                        .long
-                        .is_some_and(|file| from.file() == file)
-                    {
-                        self.clear_long_castling_rights(color);
-                    } else if self.castling_rights[color]
-                        .short
-                        .is_some_and(|file| from.file() == file)
-                    {
-                        self.clear_short_castling_rights(color);
-                    }
+                if self.castling_rights[color]
+                    .long
+                    .is_some_and(|file| from.file() == file)
+                {
+                    self.clear_long_castling_rights(color);
+                } else if self.castling_rights[color]
+                    .short
+                    .is_some_and(|file| from.file() == file)
+                {
+                    self.clear_short_castling_rights(color);
                 }
             }
 

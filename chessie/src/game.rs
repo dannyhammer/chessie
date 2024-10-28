@@ -59,8 +59,8 @@ impl Game {
         let color = position.side_to_move();
         let blockers = position.occupied();
 
-        let mut attacks_by_color = [Bitboard::default(); Color::COUNT];
-        let mut attacks_by_square = [Bitboard::default(); Square::COUNT];
+        let mut attacks_by_color = [Bitboard::EMPTY_BOARD; Color::COUNT];
+        let mut attacks_by_square = [Bitboard::EMPTY_BOARD; Square::COUNT];
 
         for square in blockers {
             let piece = position.piece_at(square).unwrap();
@@ -72,9 +72,9 @@ impl Game {
 
         let mut game = Self {
             position,
-            checkers: Bitboard::default(),
-            checkmask: Bitboard::default(),
-            pinned: Bitboard::default(),
+            checkers: Bitboard::EMPTY_BOARD,
+            checkmask: Bitboard::EMPTY_BOARD,
+            pinned: Bitboard::EMPTY_BOARD,
             // attacks_by_color,
             // attacks_by_square,
             king_square: Square::default(),
@@ -100,12 +100,12 @@ impl Game {
     /// ```
     /// # use chessie::*;
     /// // 518 is the Scharnagl number for startpos
-    /// let startpos = Game::from_frc(518);
+    /// let startpos = Game::from_960(518);
     /// assert_eq!(startpos, Game::from_fen(FEN_STARTPOS).unwrap());
     /// ```
     #[inline(always)]
-    pub fn from_frc(n: usize) -> Self {
-        Self::new(Position::from_dfrc(n, n))
+    pub fn from_960(n: usize) -> Self {
+        Self::new(Position::from_d960(n, n))
     }
 
     /// Converts a pair of [Scharnagl Numbers](https://en.wikipedia.org/wiki/Fischer_random_chess_numbering_scheme#Direct_derivation) to a Double Fischer Random Chess starting position.
@@ -114,8 +114,8 @@ impl Game {
     ///
     /// If either Scharnagl number `>= 960`, as there are only 960 valid starting positions.
     #[inline(always)]
-    pub fn from_dfrc(white_scharnagl: usize, black_scharnagl: usize) -> Self {
-        Self::new(Position::from_dfrc(white_scharnagl, black_scharnagl))
+    pub fn from_d960(white_scharnagl: usize, black_scharnagl: usize) -> Self {
+        Self::new(Position::from_d960(white_scharnagl, black_scharnagl))
     }
 
     /// Copies `self` and returns a [`Game`] after having applied the provided [`Move`].
@@ -192,7 +192,7 @@ impl Game {
         self.king_square = self.king(color).to_square_unchecked();
 
         // Reset the pinmask and checkmask
-        self.pinned = Bitboard::default();
+        self.pinned = Bitboard::EMPTY_BOARD;
         // Sanity check; no move can capture the enemy King, so his square is removed
         self.checkmask = self.enemy_or_empty(color) ^ self.king(opponent);
 
@@ -506,53 +506,25 @@ impl Game {
         let from = self.king_square;
         let color = self.side_to_move();
         for to in self.generate_legal_king_mobility::<IN_CHECK>(color, from) {
-            let victim = self.piece_at(to);
-            let mut kind = if victim.is_some() {
-                MoveKind::Capture
+            let kind = if let Some(victim) = self.piece_at(to) {
+                // If the victim is friendly, this is a castling move (KxR).
+                if victim.color() == color {
+                    if to.file() > from.file() {
+                        MoveKind::ShortCastle
+                    } else {
+                        MoveKind::LongCastle
+                    }
+                } else {
+                    MoveKind::Capture
+                }
             } else {
                 MoveKind::Quiet
             };
-
-            // if from == Square::E1.rank_relative_to(color) {
-            //     if to == Square::G1.rank_relative_to(color) {
-            //         kind = MoveKind::ShortCastle;
-            //     } else if to == Square::C1.rank_relative_to(color) {
-            //         kind = MoveKind::LongCastle;
-            //     }
-            // }
-
-            // If this move "captures" our own Rook, it is castling
-            if victim.is_some_and(|p| p.is_rook() && p.color() == color) {
-                // Determine which side of castling this is
-                if to.file() > from.file() {
-                    kind = MoveKind::ShortCastle;
-                } else {
-                    kind = MoveKind::LongCastle;
-                }
-            }
 
             let mv = Move::new(from, to, kind);
             moves.push(mv);
         }
     }
-
-    /*
-    /// Generate all legal captures from the current position.
-    ///
-    /// **Note**: This does not include en passant, for simplicity
-    pub fn get_legal_captures(&self) -> MoveList {
-        self.iter().only_captures().collect()
-    }
-     */
-
-    /*
-    /// Yields a [`MoveGenIter`] to iterate over all legal moves available in the current position.
-    ///
-    /// If your intent is to search _every_ available move, use [`Game::get_legal_moves`] instead.
-    pub fn iter(&self) -> MoveGenIter {
-        MoveGenIter::new(self)
-    }
-     */
 
     /*
     // TODO: https://github.com/dannyhammer/brogle/issues/9
@@ -721,7 +693,7 @@ impl Game {
     fn generate_ep_bitboard(&self, color: Color, square: Square, ep_square: Square) -> Bitboard {
         // If this Pawn isn't on an adjacent file and the same rank as the enemy Pawn that caused en passant to be possible, it can't perform en passant
         if square.distance_ranks(ep_square) != 1 || square.distance_files(ep_square) != 1 {
-            return Bitboard::default();
+            return Bitboard::EMPTY_BOARD;
         }
 
         // Compute a blockers bitboard as if EP was performed.
@@ -732,13 +704,13 @@ impl Game {
         // If, after performing EP, any sliders can attack our King, EP is not legal
         let enemy_ortho_sliders = self.orthogonal_sliders(color.opponent());
         if (rook_attacks(self.king_square, blockers_after_ep) & enemy_ortho_sliders).is_nonempty() {
-            return Bitboard::default();
+            return Bitboard::EMPTY_BOARD;
         }
 
         let enemy_diag_sliders = self.diagonal_sliders(color.opponent());
         if (bishop_attacks(self.king_square, blockers_after_ep) & enemy_diag_sliders).is_nonempty()
         {
-            return Bitboard::default();
+            return Bitboard::EMPTY_BOARD;
         }
 
         // Otherwise, it is safe to perform EP
@@ -756,7 +728,7 @@ impl Game {
 
         // If in check, we cannot castle- we can only attack with the default movement of the King.
         let castling = if IN_CHECK {
-            Bitboard::default()
+            Bitboard::EMPTY_BOARD
         } else {
             // Otherwise, compute castling availability like normal
             let short = self.castling_rights_for(color).short.map(|rook| {
@@ -786,30 +758,47 @@ impl Game {
     }
 
     /// Generate a bitboard for `color`'s ability to castle with the Rook on `rook_square`, which will place the King on `dst_square`.
+    #[inline(always)]
     fn generate_castling_bitboard(
         &self,
         rook_square: Square,
         rook_dst_square: Square,
-        dst_square: Square,
+        king_dst_square: Square,
         enemy_attacks: Bitboard,
     ) -> Bitboard {
         // The King and Rook don't count as blockers, since they're moving through each other
         let blockers = self.occupied() ^ self.king_square ^ rook_square;
 
         // All squares between the King and his destination must be empty
-        let king_to_dst = ray_between(self.king_square, dst_square) | dst_square;
+        let king_to_dst = ray_between(self.king_square, king_dst_square) | king_dst_square;
         // All squares between the Rook and its destination must be empty
         let rook_to_dst = ray_between(rook_square, rook_dst_square) | rook_dst_square;
         let squares_are_empty =
             (rook_to_dst & blockers).is_empty() && (king_to_dst & blockers).is_empty();
 
         // All squares between the King and his destination (inclusive) must not be attacked
-        let squares_that_must_be_safe =
-            ray_between(self.king_square, dst_square) | dst_square | (self.pinned() & rook_square); // If the Rook is pinned, we can't castle
+        let squares_that_must_be_safe = ray_between(self.king_square, king_dst_square)
+            | king_dst_square
+            | (self.pinned() & rook_square); // If the Rook is pinned, we can't castle
         let squares_are_safe = (squares_that_must_be_safe & enemy_attacks).is_empty();
 
         Bitboard::from_square(rook_square)
             & Bitboard::from_bool(squares_are_empty && squares_are_safe)
+
+        /*
+        // All squares between the King and Rook must be empty
+        let blockers = self.occupied();
+        let squares_that_must_be_empty = ray_between(self.king_square, rook_square);
+        let squares_are_empty = (squares_that_must_be_empty & blockers).is_empty();
+
+        // All squares between the King and his destination must not be attacked
+        let squares_that_must_be_safe = ray_between(self.king_square, king_dst_square);
+
+        let squares_are_safe = (squares_that_must_be_safe & enemy_attacks).is_empty();
+
+        Bitboard::from_square(king_dst_square)
+            & Bitboard::from_bool(squares_are_empty && squares_are_safe)
+          */
     }
 
     /// These are the rays containing the King and his Checkers.
@@ -817,7 +806,7 @@ impl Game {
     /// Note: A pawn can't generate a discoverable check, as it can only capture 1 square away.
     #[inline(always)]
     fn generate_discoverable_checks_bitboard(&self, color: Color) -> Bitboard {
-        let mut discoverable = Bitboard::default();
+        let mut discoverable = Bitboard::EMPTY_BOARD;
 
         for checker in self.checkers & self.sliders(color.opponent()) {
             // Need to XOR because capturing the checker is legal

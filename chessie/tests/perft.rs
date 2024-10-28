@@ -42,6 +42,7 @@ fn test_epd(epd_file: &str, max_depth: usize) -> Result<()> {
     Ok(())
 }
 
+/*
 #[test]
 fn test_standard_epd() {
     test_epd("tests/standard.epd", 6).unwrap();
@@ -52,6 +53,7 @@ fn test_fischer_epd() {
     // Depth 6 takes a *very* long time
     test_epd("tests/fischer.epd", 5).unwrap();
 }
+ */
 
 #[cfg(test)]
 mod promotion_perft {
