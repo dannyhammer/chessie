@@ -42,6 +42,7 @@ impl ZobristKey {
     }
 
     /// Generates a [`ZobristKey`] from the provided components of a [`Position`].
+    #[inline(always)]
     pub fn from_parts(
         board: &Board,
         ep_square: Option<Square>,
@@ -177,8 +178,8 @@ impl ZobristKey {
     ///
     ///
     /// // Default castling rights
-    /// let white = CastlingRights::new(Some(File::H), Some(File::A));
-    /// let black = CastlingRights::new(Some(File::H), Some(File::A));
+    /// let white = CastlingRights::new(Some(Square::H1), Some(Square::A1));
+    /// let black = CastlingRights::new(Some(Square::H8), Some(Square::A8));
     /// let rights = [white, black];
     ///
     /// let mut default_rights = ZobristKey::default();
@@ -217,6 +218,7 @@ impl ZobristKey {
 }
 
 impl fmt::Display for ZobristKey {
+    #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }

@@ -414,7 +414,7 @@ impl Bitboard {
     /// # Example
     /// ```
     /// # use chessie_types::{Bitboard, Square};
-    /// let mut board = Bitboard::default();
+    /// let mut board = Bitboard::EMPTY_BOARD;
     /// board.set(Square::G2);
     /// assert_eq!(board.to_hex_string(), "0x0000000000004000");
     /// ```

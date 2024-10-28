@@ -96,7 +96,7 @@ fn generate_ray_between_table() -> [[Bitboard; Square::COUNT]; Square::COUNT] {
 
     for from in Square::iter() {
         for (df, dr) in QUEEN_DELTAS {
-            let mut ray = Bitboard::default(); // Do not include `from`
+            let mut ray = Bitboard::EMPTY_BOARD; // Do not include `from`
             let mut to = from;
             while let Some(shifted) = to.offset(df, dr) {
                 ray.set(shifted);
@@ -221,7 +221,7 @@ pub fn generate_piece_attack_datfiles<P: AsRef<Path>>(outdir: P) -> std::io::Res
 ///
 /// Pawns, by default, may push forward by one, except when pushing from their starting rank (rank 2 for White, rank 7 for Black), in which case they may push forward by two.
 fn generate_pawn_pushes(color: Color) -> [Bitboard; 64] {
-    let mut boards = [Bitboard::default(); Square::COUNT];
+    let mut boards = [Bitboard::EMPTY_BOARD; Square::COUNT];
     for square in Square::iter() {
         let bb = Bitboard::from_square(square);
 
@@ -238,7 +238,7 @@ fn generate_pawn_pushes(color: Color) -> [Bitboard; 64] {
 ///
 /// Pawns, by default, may capture diagonally forward by one.
 fn generate_pawn_attacks(color: Color) -> [Bitboard; 64] {
-    let mut boards = [Bitboard::default(); Square::COUNT];
+    let mut boards = [Bitboard::EMPTY_BOARD; Square::COUNT];
     for square in Square::iter() {
         let bb = Bitboard::from_square(square);
 
@@ -253,12 +253,12 @@ fn generate_pawn_attacks(color: Color) -> [Bitboard; 64] {
 /// In standard chess, the Leapers are the King and Knight.
 fn generate_leaper_mobility(deltas: &[(i8, i8)]) -> [Bitboard; Square::COUNT] {
     // Represents all locations this piece can reach from that square/index.
-    let mut mobility = [Bitboard::default(); Square::COUNT];
+    let mut mobility = [Bitboard::EMPTY_BOARD; Square::COUNT];
 
     for square in Square::iter() {
         // All reachable locations from `square`.
         // This is empty because we cannot "move to" the square where we are currently.
-        let mut movement = Bitboard::default();
+        let mut movement = Bitboard::EMPTY_BOARD;
 
         // Loop over every pair of deltas
         for (df, dr) in deltas {
@@ -281,12 +281,12 @@ fn generate_leaper_mobility(deltas: &[(i8, i8)]) -> [Bitboard; Square::COUNT] {
 /// In standard chess, the Riders are the Rook, Bishop, and Queen.
 fn generate_rider_mobility(deltas: &[(i8, i8)]) -> [Bitboard; Square::COUNT] {
     // Represents all locations this piece can reach from that square/index.
-    let mut mobility = [Bitboard::default(); Square::COUNT];
+    let mut mobility = [Bitboard::EMPTY_BOARD; Square::COUNT];
 
     for square in Square::iter() {
         // All reachable locations from `square`.
         // This is empty because we cannot "move to" the square where we are currently.
-        let mut movement = Bitboard::default();
+        let mut movement = Bitboard::EMPTY_BOARD;
 
         // Loop over every pair of deltas
         for (df, dr) in deltas {

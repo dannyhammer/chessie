@@ -42,7 +42,7 @@ pub struct Game {
     pinned: Bitboard,
 
     /// All squares (pseudo-legally) attacked by a specific color.
-    // attacks_by_color: [Bitboard; Color::COUNT],
+    attacks_by_color: [Bitboard; Color::COUNT],
 
     /// Pseudo-legal attacks from every given square on the board.
     // attacks_by_square: [Bitboard; Square::COUNT],
@@ -53,14 +53,15 @@ pub struct Game {
 
 impl Game {
     /// Creates a new [`Game`] from  the provided [`Position`].
+    #[inline(always)]
     pub fn new(position: Position) -> Self {
         /*
         // Compute attack/defend maps by square and color
         let color = position.side_to_move();
         let blockers = position.occupied();
 
-        let mut attacks_by_color = [Bitboard::default(); Color::COUNT];
-        let mut attacks_by_square = [Bitboard::default(); Square::COUNT];
+        let mut attacks_by_color = [Bitboard::EMPTY_BOARD; Color::COUNT];
+        let mut attacks_by_square = [Bitboard::EMPTY_BOARD; Square::COUNT];
 
         for square in blockers {
             let piece = position.piece_at(square).unwrap();
@@ -72,10 +73,10 @@ impl Game {
 
         let mut game = Self {
             position,
-            checkers: Bitboard::default(),
-            checkmask: Bitboard::default(),
-            pinned: Bitboard::default(),
-            // attacks_by_color,
+            checkers: Bitboard::EMPTY_BOARD,
+            checkmask: Bitboard::EMPTY_BOARD,
+            pinned: Bitboard::EMPTY_BOARD,
+            attacks_by_color: [Bitboard::EMPTY_BOARD; Color::COUNT],
             // attacks_by_square,
             king_square: Square::default(),
         };
@@ -100,12 +101,12 @@ impl Game {
     /// ```
     /// # use chessie::*;
     /// // 518 is the Scharnagl number for startpos
-    /// let startpos = Game::from_frc(518);
+    /// let startpos = Game::from_960(518);
     /// assert_eq!(startpos, Game::from_fen(FEN_STARTPOS).unwrap());
     /// ```
     #[inline(always)]
-    pub fn from_frc(n: usize) -> Self {
-        Self::new(Position::from_dfrc(n, n))
+    pub fn from_960(n: usize) -> Self {
+        Self::new(Position::from_d960(n, n))
     }
 
     /// Converts a pair of [Scharnagl Numbers](https://en.wikipedia.org/wiki/Fischer_random_chess_numbering_scheme#Direct_derivation) to a Double Fischer Random Chess starting position.
@@ -114,8 +115,8 @@ impl Game {
     ///
     /// If either Scharnagl number `>= 960`, as there are only 960 valid starting positions.
     #[inline(always)]
-    pub fn from_dfrc(white_scharnagl: usize, black_scharnagl: usize) -> Self {
-        Self::new(Position::from_dfrc(white_scharnagl, black_scharnagl))
+    pub fn from_d960(white_scharnagl: usize, black_scharnagl: usize) -> Self {
+        Self::new(Position::from_d960(white_scharnagl, black_scharnagl))
     }
 
     /// Copies `self` and returns a [`Game`] after having applied the provided [`Move`].
@@ -182,6 +183,24 @@ impl Game {
         Ok(())
     }
 
+    /// Returns `true` if the side-to-move is currently in check.
+    #[inline(always)]
+    pub const fn is_in_check(&self) -> bool {
+        self.checkers.population() > 0
+    }
+
+    /// Returns `true` if the side-to-move is currently in double check (in check by more than one piece).
+    #[inline(always)]
+    pub const fn is_in_double_check(&self) -> bool {
+        self.checkers.population() > 1
+    }
+
+    /// Returns a [`Bitboard`] of all squares attacked by `color`.
+    #[inline(always)]
+    pub const fn attacks_by_color(&self, color: Color) -> Bitboard {
+        self.attacks_by_color[color.index()]
+    }
+
     /// Recomputes legal metadata (checkers, checkmask, pinmask, etc.).
     #[inline(always)]
     fn recompute_legal_masks(&mut self) {
@@ -192,7 +211,7 @@ impl Game {
         self.king_square = self.king(color).to_square_unchecked();
 
         // Reset the pinmask and checkmask
-        self.pinned = Bitboard::default();
+        self.pinned = Bitboard::EMPTY_BOARD;
         // Sanity check; no move can capture the enemy King, so his square is removed
         self.checkmask = self.enemy_or_empty(color) ^ self.king(opponent);
 
@@ -233,6 +252,11 @@ impl Game {
             for checker in self.checkers {
                 self.checkmask |= ray_between(self.king_square, checker);
             }
+        }
+
+        // Recompute attack/defend maps
+        for color in Color::all() {
+            self.attacks_by_color[color] = compute_attacks_by(self.board(), color);
         }
     }
 
@@ -393,14 +417,6 @@ impl Game {
         self.generate_king_moves::<IN_CHECK>(mask, moves);
     }
 
-    // fn generate_pawn_moves<const IN_CHECK: bool>(&self, moves: &mut MoveList) {
-    //     let color = self.side_to_move();
-
-    //     // Any pawn can push forward once, so long as there's nothing blocking it & it's not horizontally pinned
-    //     let pawns_that_can_push = self.pawns(color);
-    //     let single_pushes = pawns_that_can_push.advance_by(color, 1);
-    // }
-
     /// Creates and appends a [`Move`] that is either a quiet or capture.
     #[inline(always)]
     fn serialize_normal_move(&self, to: Square, from: Square, moves: &mut MoveList) {
@@ -455,105 +471,13 @@ impl Game {
         }
     }
 
-    /// Generates and serializes all legal Knight moves.
-    fn generate_knight_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
-        let color = self.side_to_move();
-        for from in self.knights(color) & mask {
-            let attacks = knight_attacks(from);
-            let mobility = self.generate_legal_normal_piece_mobility::<IN_CHECK>(from, attacks);
+    // fn generate_pawn_moves<const IN_CHECK: bool>(&self, moves: &mut MoveList) {
+    //     let color = self.side_to_move();
 
-            for to in mobility {
-                self.serialize_normal_move(to, from, moves);
-            }
-        }
-    }
-
-    /// Generates and serializes all legal Bishop moves.
-    fn generate_bishop_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
-        let color = self.side_to_move();
-        let blockers = self.occupied();
-        for from in self.diagonal_sliders(color) & mask {
-            let attacks = bishop_attacks(from, blockers);
-            let mobility = self.generate_legal_normal_piece_mobility::<IN_CHECK>(from, attacks);
-
-            for to in mobility {
-                self.serialize_normal_move(to, from, moves);
-            }
-        }
-    }
-
-    /// Generates and serializes all legal Rook moves.
-    fn generate_rook_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
-        let color = self.side_to_move();
-        let blockers = self.occupied();
-        for from in self.orthogonal_sliders(color) & mask {
-            let attacks = rook_attacks(from, blockers);
-            let mobility = self.generate_legal_normal_piece_mobility::<IN_CHECK>(from, attacks);
-
-            for to in mobility {
-                self.serialize_normal_move(to, from, moves);
-            }
-        }
-    }
-
-    /// Generates and serializes all legal King moves.
-    fn generate_king_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
-        // If the mask doesn't contain the King, then don't generate the King's moves
-        if mask.is_disjoint(self.king_square) {
-            return;
-        }
-
-        let from = self.king_square;
-        let color = self.side_to_move();
-        for to in self.generate_legal_king_mobility::<IN_CHECK>(color, from) {
-            let victim = self.piece_at(to);
-            let mut kind = if victim.is_some() {
-                MoveKind::Capture
-            } else {
-                MoveKind::Quiet
-            };
-
-            // if from == Square::E1.rank_relative_to(color) {
-            //     if to == Square::G1.rank_relative_to(color) {
-            //         kind = MoveKind::ShortCastle;
-            //     } else if to == Square::C1.rank_relative_to(color) {
-            //         kind = MoveKind::LongCastle;
-            //     }
-            // }
-
-            // If this move "captures" our own Rook, it is castling
-            if victim.is_some_and(|p| p.is_rook() && p.color() == color) {
-                // Determine which side of castling this is
-                if to.file() > from.file() {
-                    kind = MoveKind::ShortCastle;
-                } else {
-                    kind = MoveKind::LongCastle;
-                }
-            }
-
-            let mv = Move::new(from, to, kind);
-            moves.push(mv);
-        }
-    }
-
-    /*
-    /// Generate all legal captures from the current position.
-    ///
-    /// **Note**: This does not include en passant, for simplicity
-    pub fn get_legal_captures(&self) -> MoveList {
-        self.iter().only_captures().collect()
-    }
-     */
-
-    /*
-    /// Yields a [`MoveGenIter`] to iterate over all legal moves available in the current position.
-    ///
-    /// If your intent is to search _every_ available move, use [`Game::get_legal_moves`] instead.
-    pub fn iter(&self) -> MoveGenIter {
-        MoveGenIter::new(self)
-    }
-     */
-
+    //     // Any pawn can push forward once, so long as there's nothing blocking it & it's not horizontally pinned
+    //     let pawns_that_can_push = self.pawns(color);
+    //     let single_pushes = pawns_that_can_push.advance_by(color, 1);
+    // }
     /*
     // TODO: https://github.com/dannyhammer/brogle/issues/9
     fn compute_pawn_moves(
@@ -636,18 +560,77 @@ impl Game {
             }
         }
     }
-     */
+    */
 
-    /// Returns `true` if the side-to-move is currently in check.
-    #[inline(always)]
-    pub const fn is_in_check(&self) -> bool {
-        self.checkers.population() > 0
+    /// Generates and serializes all legal Knight moves.
+    fn generate_knight_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
+        let color = self.side_to_move();
+        for from in self.knights(color) & mask {
+            let attacks = knight_attacks(from);
+            let mobility = self.generate_legal_normal_piece_mobility::<IN_CHECK>(from, attacks);
+
+            for to in mobility {
+                self.serialize_normal_move(to, from, moves);
+            }
+        }
     }
 
-    /// Returns `true` if the side-to-move is currently in double check (in check by more than one piece).
-    #[inline(always)]
-    pub const fn is_in_double_check(&self) -> bool {
-        self.checkers.population() > 1
+    /// Generates and serializes all legal Bishop moves.
+    fn generate_bishop_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
+        let color = self.side_to_move();
+        let blockers = self.occupied();
+        for from in self.diagonal_sliders(color) & mask {
+            let attacks = bishop_attacks(from, blockers);
+            let mobility = self.generate_legal_normal_piece_mobility::<IN_CHECK>(from, attacks);
+
+            for to in mobility {
+                self.serialize_normal_move(to, from, moves);
+            }
+        }
+    }
+
+    /// Generates and serializes all legal Rook moves.
+    fn generate_rook_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
+        let color = self.side_to_move();
+        let blockers = self.occupied();
+        for from in self.orthogonal_sliders(color) & mask {
+            let attacks = rook_attacks(from, blockers);
+            let mobility = self.generate_legal_normal_piece_mobility::<IN_CHECK>(from, attacks);
+
+            for to in mobility {
+                self.serialize_normal_move(to, from, moves);
+            }
+        }
+    }
+
+    /// Generates and serializes all legal King moves.
+    fn generate_king_moves<const IN_CHECK: bool>(&self, mask: Bitboard, moves: &mut MoveList) {
+        // If the mask doesn't contain the King, then don't generate the King's moves
+        if mask.is_disjoint(self.king_square) {
+            return;
+        }
+
+        let from = self.king_square;
+        let color = self.side_to_move();
+        for to in self.generate_legal_king_mobility::<IN_CHECK>(color, from) {
+            let kind = if let Some(victim) = self.piece_at(to) {
+                // If the victim is friendly, this is a castling move (KxR).
+                if victim.color() == color {
+                    if to.file() > from.file() {
+                        MoveKind::ShortCastle
+                    } else {
+                        MoveKind::LongCastle
+                    }
+                } else {
+                    MoveKind::Capture
+                }
+            } else {
+                MoveKind::Quiet
+            };
+
+            let mv = Move::new(from, to, kind);
+            moves.push(mv);
+        }
     }
 
     /// Generates a [`Bitboard`] of all legal moves for `piece` at `square`.
@@ -718,10 +701,11 @@ impl Game {
     ///
     /// If en passant is legal, the returned bitboard will have a single bit set, representing a legal capture for the Pawn at `square`.
     /// If en passant is not legal, the returned bitboard will be empty.
+    #[inline(always)]
     fn generate_ep_bitboard(&self, color: Color, square: Square, ep_square: Square) -> Bitboard {
         // If this Pawn isn't on an adjacent file and the same rank as the enemy Pawn that caused en passant to be possible, it can't perform en passant
         if square.distance_ranks(ep_square) != 1 || square.distance_files(ep_square) != 1 {
-            return Bitboard::default();
+            return Bitboard::EMPTY_BOARD;
         }
 
         // Compute a blockers bitboard as if EP was performed.
@@ -732,13 +716,13 @@ impl Game {
         // If, after performing EP, any sliders can attack our King, EP is not legal
         let enemy_ortho_sliders = self.orthogonal_sliders(color.opponent());
         if (rook_attacks(self.king_square, blockers_after_ep) & enemy_ortho_sliders).is_nonempty() {
-            return Bitboard::default();
+            return Bitboard::EMPTY_BOARD;
         }
 
         let enemy_diag_sliders = self.diagonal_sliders(color.opponent());
         if (bishop_attacks(self.king_square, blockers_after_ep) & enemy_diag_sliders).is_nonempty()
         {
-            return Bitboard::default();
+            return Bitboard::EMPTY_BOARD;
         }
 
         // Otherwise, it is safe to perform EP
@@ -752,22 +736,20 @@ impl Game {
         square: Square,
     ) -> Bitboard {
         let attacks = king_attacks(square);
-        let enemy_attacks = compute_attacks_by(self, color.opponent());
+        let enemy_attacks = self.attacks_by_color(color.opponent());
 
         // If in check, we cannot castle- we can only attack with the default movement of the King.
         let castling = if IN_CHECK {
-            Bitboard::default()
+            Bitboard::EMPTY_BOARD
         } else {
             // Otherwise, compute castling availability like normal
-            let short = self.castling_rights_for(color).short.map(|rook| {
-                let rook_start = Square::new(rook, Rank::first(color));
+            let short = self.castling_rights_for(color).short.map(|rook_start| {
                 let king_end = Square::king_short_castle(color);
                 let rook_end = Square::rook_short_castle(color);
                 self.generate_castling_bitboard(rook_start, rook_end, king_end, enemy_attacks)
             });
 
-            let long = self.castling_rights_for(color).long.map(|rook| {
-                let rook_start = Square::new(rook, Rank::first(color));
+            let long = self.castling_rights_for(color).long.map(|rook_start| {
                 let king_end = Square::king_long_castle(color);
                 let rook_end = Square::rook_long_castle(color);
                 self.generate_castling_bitboard(rook_start, rook_end, king_end, enemy_attacks)
@@ -786,26 +768,28 @@ impl Game {
     }
 
     /// Generate a bitboard for `color`'s ability to castle with the Rook on `rook_square`, which will place the King on `dst_square`.
+    #[inline(always)]
     fn generate_castling_bitboard(
         &self,
         rook_square: Square,
         rook_dst_square: Square,
-        dst_square: Square,
+        king_dst_square: Square,
         enemy_attacks: Bitboard,
     ) -> Bitboard {
         // The King and Rook don't count as blockers, since they're moving through each other
         let blockers = self.occupied() ^ self.king_square ^ rook_square;
 
         // All squares between the King and his destination must be empty
-        let king_to_dst = ray_between(self.king_square, dst_square) | dst_square;
+        let king_to_dst = ray_between(self.king_square, king_dst_square) | king_dst_square;
         // All squares between the Rook and its destination must be empty
         let rook_to_dst = ray_between(rook_square, rook_dst_square) | rook_dst_square;
         let squares_are_empty =
             (rook_to_dst & blockers).is_empty() && (king_to_dst & blockers).is_empty();
 
         // All squares between the King and his destination (inclusive) must not be attacked
-        let squares_that_must_be_safe =
-            ray_between(self.king_square, dst_square) | dst_square | (self.pinned() & rook_square); // If the Rook is pinned, we can't castle
+        let squares_that_must_be_safe = ray_between(self.king_square, king_dst_square)
+            | king_dst_square
+            | (self.pinned() & rook_square); // If the Rook is pinned, we can't castle
         let squares_are_safe = (squares_that_must_be_safe & enemy_attacks).is_empty();
 
         Bitboard::from_square(rook_square)
@@ -817,7 +801,7 @@ impl Game {
     /// Note: A pawn can't generate a discoverable check, as it can only capture 1 square away.
     #[inline(always)]
     fn generate_discoverable_checks_bitboard(&self, color: Color) -> Bitboard {
-        let mut discoverable = Bitboard::default();
+        let mut discoverable = Bitboard::EMPTY_BOARD;
 
         for checker in self.checkers & self.sliders(color.opponent()) {
             // Need to XOR because capturing the checker is legal

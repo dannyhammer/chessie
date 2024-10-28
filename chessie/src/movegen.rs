@@ -143,6 +143,7 @@ impl<'a> MoveGenIter<'a> {
     ///
     /// Note that if the position is currently in double check, the provided mask will have no effect,
     /// as only the King is allowed to move during a double check.
+    #[inline(always)]
     pub fn only_moves_from(mut self, mask: impl Into<Bitboard>) -> Self {
         // If in double check, we cannot generate moves for anything other than the King
         self.from_mask = if self.game.is_in_double_check() {
@@ -303,15 +304,54 @@ pub fn compute_attackers_to(board: &Board, square: Square, color: Color) -> Bitb
 }
 
 /// Computes a [`Bitboard`] of all squares attacked by `color`.
+///
+/// This is a raw attack map, meaning the squares on this map are unsafe for the friendly King to occupy.
+#[inline(always)]
 pub fn compute_attacks_by(board: &Board, color: Color) -> Bitboard {
-    let mut attacks = Bitboard::default();
     let blockers = board.occupied();
-    let color_mask = board.color(color);
-    for (square, piece) in board.iter_for(color_mask) {
-        attacks |= attacks_for(piece, square, blockers);
+
+    let mut attacks = pawn_attack_map(board, color);
+    for square in board.knights(color) {
+        attacks |= knight_attacks(square);
     }
+    for square in board.diagonal_sliders(color) {
+        attacks |= bishop_attacks(square, blockers);
+    }
+    for square in board.orthogonal_sliders(color) {
+        attacks |= rook_attacks(square, blockers);
+    }
+    for square in board.king(color) {
+        attacks |= king_attacks(square);
+    }
+
     attacks
 }
+
+/// Computes a [`Bitboard`] of all squares attacked by `color` Pawns, excluding En Passant for convenience.
+#[inline(always)]
+pub fn pawn_attack_map(board: &Board, color: Color) -> Bitboard {
+    let pushes = board.pawns(color).forward_by(color, 1);
+    pushes.east() | pushes.west()
+}
+
+/*
+/// Computes a [`Bitboard`] of all squares that `color` Pawns can push to.
+///
+/// These are *not* capture moves. Only forward pushes and double-pushes.
+#[inline(always)]
+pub fn pawn_push_map(board: &Board, color: Color) -> Bitboard {
+    let pawns = board.pawns(color);
+    let empty = board.empty();
+
+    // By default, all pawns can push forward once if they are not blocked
+    let single_pushes = pawns.forward_by(color, 1) & empty;
+
+    // Any pawn that started on the 2nd rank and was able to push once can also push again, if unblocked
+    let double_pushes = (Bitboard::third_rank(color) & single_pushes).forward_by(color, 1) & empty;
+
+    single_pushes | double_pushes
+}
+ */
 
 pub fn compute_checkers_and_pinmask(
     board: &Board,
@@ -319,8 +359,8 @@ pub fn compute_checkers_and_pinmask(
     color: Color,
 ) -> (Bitboard, Bitboard) {
     // let checkers = compute_attackers_to(board, square, color);
-    let mut checkers = Bitboard::default();
-    let mut pinmask = Bitboard::default();
+    let mut checkers = Bitboard::EMPTY_BOARD;
+    let mut pinmask = Bitboard::EMPTY_BOARD;
 
     let opponent = color.opponent();
     let occupied = board.occupied();
@@ -358,7 +398,7 @@ pub fn compute_checkers_and_pinmask(
 ///
 /// When `square` is the King's square, any pieces within the pinmask must not move outside of the pinmask.
 pub fn compute_pinmask_for(board: &Board, square: Square, color: Color) -> Bitboard {
-    let mut pinmask = Bitboard::default();
+    let mut pinmask = Bitboard::EMPTY_BOARD;
     let opponent = color.opponent();
     let occupied = board.occupied();
 

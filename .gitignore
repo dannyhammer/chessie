@@ -3,3 +3,7 @@
 # I just use these locally to test things, so they shouldn't be tracked.
 chessie/src/main.rs
 chessie_types/src/main.rs
+
+# Perf stuff
+perf.data*
+flamegraph.svg

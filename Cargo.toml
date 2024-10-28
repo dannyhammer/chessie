@@ -4,3 +4,6 @@ members = [
     "chessie_types"
 ]
 resolver = "2"
+
+[profile.release]
+lto = "fat"
