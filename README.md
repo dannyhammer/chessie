@@ -98,13 +98,17 @@ Special thanks in particular to:
 
 ## Changelog
 
--   `1.3.0`:
+-   `2.0.0`:
+    -   **Breaking**:
+        -   Refactored `CastlingRights` to store a `Square` instead of a `File`.
     -   Added support for Chess960 (Fischer Random) and Double Chess960 (Double Fischer Random).
         -   Internally changed the representation of Castling moves to "King takes Rook" to support Chess960.
         -   Added utilities for converting to/from Chess960 and standard castling moves.
         -   All `Display` implementations now utilize the alternate formatter (`#`) to print either standard or Chess960 notation for FEN strings, castling rights, and castling moves (Thanks to [`cozy_chess`](https://docs.rs/cozy-chess/latest/cozy_chess/) for this idea).
     -   Made modules private so their re-exports don't clutter up the docs.
     -   Added a `Display` implementation for `MoveKind`.
+    -   Improved movegen efficiency a bit.
+    -   Added `Game::attacks_by_color` to quickly lookup attack/defend maps.
 -   `1.2.1`:
     -   Fixed major bug causing Zobrist keys to not update properly when making moves on positions (thanks @Serdra on the EP discord).
 -   `1.2.0`:
