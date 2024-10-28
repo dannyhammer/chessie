@@ -786,21 +786,6 @@ impl Game {
 
         Bitboard::from_square(rook_square)
             & Bitboard::from_bool(squares_are_empty && squares_are_safe)
-
-        /*
-        // All squares between the King and Rook must be empty
-        let blockers = self.occupied();
-        let squares_that_must_be_empty = ray_between(self.king_square, rook_square);
-        let squares_are_empty = (squares_that_must_be_empty & blockers).is_empty();
-
-        // All squares between the King and his destination must not be attacked
-        let squares_that_must_be_safe = ray_between(self.king_square, king_dst_square);
-
-        let squares_are_safe = (squares_that_must_be_safe & enemy_attacks).is_empty();
-
-        Bitboard::from_square(king_dst_square)
-            & Bitboard::from_bool(squares_are_empty && squares_are_safe)
-          */
     }
 
     /// These are the rays containing the King and his Checkers.
