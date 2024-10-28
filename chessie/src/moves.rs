@@ -143,7 +143,10 @@ impl MoveKind {
             }
 
             // King moves are only special if castling
-            PieceKind::King if victim.is_some_and(|victim| victim.color() == piece.color()) => {
+            PieceKind::King
+                if victim
+                    .is_some_and(|victim| victim.color() == piece.color() && victim.is_rook()) =>
+            {
                 if to.file() > from.file() {
                     kind = Self::ShortCastle;
                 } else {
@@ -456,18 +459,23 @@ impl Move {
             is_ok
         }
     }
+
     /// Creates a [`Move`] from a string, according to the [Universal Chess Interface](https://en.wikipedia.org//wiki/Universal_Chess_Interface) notation, extracting extra info from the provided [`Position`]
     ///
     /// Will return a [`anyhow::Error`] if the string is invalid in any way.
     ///
     /// # Example
     /// ```
-    /// # use chessie::{Move, Square, MoveKind, PieceKind, Position};
-    /// // A sample test position for discovering promotion bugs.
+    /// # use chessie::*;
     /// let position = Position::from_fen("n1n5/PPPk4/8/8/8/8/4Kppp/5N1N b - - 0 1 ").unwrap();
     /// let b7c8b = Move::from_uci(&position, "b7c8b");
-    /// assert!(b7c8b.is_ok());
     /// assert_eq!(b7c8b.unwrap(), Move::new(Square::B7, Square::C8, MoveKind::promotion_capture(PieceKind::Bishop)));
+    ///
+    /// // Automatically parses castling moves in standard notation to use the KxR format
+    /// let position = Position::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1").unwrap();
+    /// let e1c1 = Move::from_uci(&position, "e1c1");
+    /// // Rook is on A1
+    /// assert_eq!(e1c1.unwrap(), Move::new(Square::E1, Square::A1, MoveKind::LongCastle));
     /// ```
     pub fn from_uci(position: &Position, uci: &str) -> Result<Self> {
         // Extract the to/from squares
@@ -492,8 +500,9 @@ impl Move {
         // To potentially speed up `MoveKind::new`, we check for standard castling notation here, since it will only ever be important if we're parsing castling moves in standard notation.
         let color = piece.color();
         let rank = Rank::first(color);
-        if from == Square::new(File::E, rank) {
-            // If this is a castle in UCI notation, change the destination square to the appropriate Rook
+
+        // If this is a castle in UCI notation, change the destination square to the appropriate Rook
+        if piece.is_king() && from == Square::new(File::E, rank) {
             if to == Square::new(File::G, rank) {
                 to = position.castling_rights()[color].short.ok_or(anyhow!(
                     "Cannot castle {uci:?} because {} has no castling rights for that side",
@@ -512,6 +521,99 @@ impl Move {
 
         Ok(Self::new(from, to, kind))
     }
+
+    /*
+    pub fn from_san(position: &Position, san: &str) -> Result<Self> {
+        // eprintln!("Parsing {san:?} for {}", position.to_fen());
+        let color = position.side_to_move();
+        let blockers = position.occupied();
+
+        let mut from = Square::default();
+        let to;
+        let kind;
+
+        // Handle castling first, since those are easy to parse
+        if san == "O-O" {
+            to = position.castling_rights()[color].short.unwrap();
+            from = position.king(color).to_square_unchecked();
+            return Ok(Self::new(from, to, MoveKind::ShortCastle));
+        } else if san == "O-O-O" {
+            to = position.castling_rights()[color].long.unwrap();
+            from = position.king(color).to_square_unchecked();
+            return Ok(Self::new(from, to, MoveKind::LongCastle));
+        }
+
+        let get_square = |s: &str, piece: Option<PieceKind>| -> Result<Square> {
+            let square = s.parse()?;
+
+            let mut origin = Err(anyhow!("No piece can move to {s:?}"));
+
+            // Find the only piece that could move here.
+            let kinds = if let Some(piece) = piece {
+                &[piece][..]
+            } else {
+                &PieceKind::all()[..]
+            };
+            for kind in kinds {
+                let piece = Piece::new(color, *kind);
+                let attacks = attacks_for(piece, square, blockers);
+                let overlap = attacks & position.piece(piece);
+                if overlap.population() == 1 {
+                    origin = Ok(overlap.to_square_unchecked());
+                    eprintln!(
+                        "{} on {} can move to {square}",
+                        overlap.to_square_unchecked(),
+                        piece.name()
+                    );
+                }
+            }
+
+            origin
+        };
+
+        // Now handle single squares
+        if let Ok(square) = san.parse() {
+            to = square;
+            from = get_square(san, None)?;
+
+            return Ok(Self::new(from, to, MoveKind::Quiet));
+        }
+
+        let mut chars = san.chars();
+
+        let first_char = chars.next().ok_or(anyhow!("Cannot parse empty SAN move"))?;
+
+        // If it's an uppercase char, find the piece associated with this move
+        if first_char.is_uppercase() {
+            let piece = Piece::new(color, PieceKind::from_uci(first_char)?);
+            let bb = position.piece(piece);
+
+            match bb.population() {
+                0 => bail!("No {} found on the board", piece.name()),
+                1 => from = bb.to_square_unchecked(),
+                _ => {
+                    //
+                }
+            }
+
+            let next = chars
+                .next()
+                .ok_or(anyhow!("Expected more than just a single piece character"))?;
+
+            if next == 'x' {
+                kind = MoveKind::Capture;
+            } else {
+                kind = MoveKind::Quiet;
+            }
+
+            let to = Square::default();
+
+            return Ok(Self::new(from, to, kind));
+        }
+
+        bail!("Could not parse SAN move {san:?}")
+    }
+     */
 
     /// Converts this [`Move`] to a string, according to the [Universal Chess Interface](https://en.wikipedia.org//wiki/Universal_Chess_Interface) notation.
     ///
@@ -550,10 +652,10 @@ impl Move {
     pub fn into_standard_castle(self) -> Self {
         if self.is_short_castle() {
             let new_to = Square::new(File::G, self.from().rank());
-            Self::new(self.from(), new_to, self.kind())
+            Self::new(self.from(), new_to, MoveKind::ShortCastle)
         } else if self.is_long_castle() {
             let new_to = Square::new(File::C, self.from().rank());
-            Self::new(self.from(), new_to, self.kind())
+            Self::new(self.from(), new_to, MoveKind::LongCastle)
         } else {
             // If this move isn't a castle, no modification needs to be done
             self
@@ -781,19 +883,48 @@ mod test {
         let king_fen = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
 
         // Kingside (short) castling (White)
-        let mv = Move::new(Square::E1, Square::G1, MoveKind::ShortCastle);
+        let mv = Move::new(Square::E1, Square::H1, MoveKind::ShortCastle);
         test_move_parse(king_fen, "e1g1", mv);
 
         // Queenside (long) castling (White)
-        let mv = Move::new(Square::E1, Square::C1, MoveKind::LongCastle);
+        let mv = Move::new(Square::E1, Square::A1, MoveKind::LongCastle);
         test_move_parse(king_fen, "e1c1", mv);
 
         // Kingside (short) castling (Black)
-        let mv = Move::new(Square::E8, Square::G8, MoveKind::ShortCastle);
+        let mv = Move::new(Square::E8, Square::H8, MoveKind::ShortCastle);
         test_move_parse(king_fen, "e8g8", mv);
 
         // Queenside (long) castling (Black)
-        let mv = Move::new(Square::E8, Square::C8, MoveKind::LongCastle);
+        let mv = Move::new(Square::E8, Square::A8, MoveKind::LongCastle);
         test_move_parse(king_fen, "e8c8", mv);
     }
+
+    /*
+        fn test_parse_san() {
+            let fen = "r2qkb1r/ppp2ppp/2n1pn2/8/2PP4/2NbBN2/PP3PPP/R2QK2R w KQkq - 0 1";
+            let mut pos = Position::from_fen(fen).unwrap();
+            let mut moves = "
+    Qxd3 Bd6
+    Rd1  O-O
+    c5   Be7
+    O-O  h6
+    h3   Re8
+    a4   a5
+    Rfe1 Rc8
+    Qb5  Nb4
+    Qxa5 Nc2
+    Re2  b6
+    Qb5  Nxe3
+    Rxe3 bxc5
+    dxc5 c6
+    Rxd8 cxb5
+    Rxc8 Rxc8"
+                .split_ascii_whitespace();
+
+            for san in moves {
+                let mv = Move::from_san(&pos, san).unwrap();
+                pos.make_move(mv);
+            }
+        }
+         */
 }

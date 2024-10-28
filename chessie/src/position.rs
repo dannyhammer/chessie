@@ -583,25 +583,26 @@ impl Position {
         if mv.is_capture() {
             // If this move was en passant, the piece we captured isn't at `to`, it's one square behind
             let victim_square = if mv.is_en_passant() {
-                // Safety: En passant cannot occur on the first or eighth, so this is guaranteed to have a square behind it.
+                // Safety: En passant cannot occur on the first or eighth rank, so this is guaranteed to have a square behind it.
                 unsafe { to.backward_by(color, 1).unwrap_unchecked() }
             } else {
                 to
             };
 
             // Safety: This is a capture; there *must* be a piece at the destination square.
-            let victim = unsafe { self.take(victim_square).unwrap_unchecked() };
+            let victim = self.take(victim_square).unwrap();
+            // let victim = unsafe { self.take(victim_square).unwrap_unchecked() };
             let victim_color = victim.color();
 
             // If the capture was on a rook's starting square, disable that side's castling.
             if self.castling_rights[victim_color]
                 .long
-                .is_some_and(|sq| to == sq)
+                .is_some_and(|sq| victim_square == sq)
             {
                 self.clear_long_castling_rights(victim_color);
             } else if self.castling_rights[victim_color]
                 .short
-                .is_some_and(|sq| to == sq)
+                .is_some_and(|sq| victim_square == sq)
             {
                 self.clear_short_castling_rights(victim_color);
             }
@@ -614,7 +615,8 @@ impl Position {
             self.key.hash_optional_ep_square(self.ep_square());
         } else if mv.is_short_castle() {
             // Safety; This is a castle. There *must* be a Rook at `to`.
-            let rook = unsafe { self.take(to).unwrap_unchecked() };
+            // let rook = unsafe { self.take(to).unwrap_unchecked() };
+            let rook = self.take(to).unwrap();
             self.place(rook, Square::rook_short_castle(color));
 
             // The King doesn't actually move to the Rook, so update the destination square
@@ -624,7 +626,8 @@ impl Position {
             self.clear_castling_rights(color);
         } else if mv.is_long_castle() {
             // Safety; This is a castle. There *must* be a Rook at `to`.
-            let rook = unsafe { self.take(to).unwrap_unchecked() };
+            // let rook = unsafe { self.take(to).unwrap_unchecked() };
+            let rook = self.take(to).unwrap();
             self.place(rook, Square::rook_long_castle(color));
 
             // The King doesn't actually move to the Rook, so update the destination square
