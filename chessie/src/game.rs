@@ -733,15 +733,13 @@ impl Game {
             Bitboard::EMPTY_BOARD
         } else {
             // Otherwise, compute castling availability like normal
-            let short = self.castling_rights_for(color).short.map(|rook| {
-                let rook_start = Square::new(rook, Rank::first(color));
+            let short = self.castling_rights_for(color).short.map(|rook_start| {
                 let king_end = Square::king_short_castle(color);
                 let rook_end = Square::rook_short_castle(color);
                 self.generate_castling_bitboard(rook_start, rook_end, king_end, enemy_attacks)
             });
 
-            let long = self.castling_rights_for(color).long.map(|rook| {
-                let rook_start = Square::new(rook, Rank::first(color));
+            let long = self.castling_rights_for(color).long.map(|rook_start| {
                 let king_end = Square::king_long_castle(color);
                 let rook_end = Square::rook_long_castle(color);
                 self.generate_castling_bitboard(rook_start, rook_end, king_end, enemy_attacks)

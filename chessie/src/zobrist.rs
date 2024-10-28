@@ -178,8 +178,8 @@ impl ZobristKey {
     ///
     ///
     /// // Default castling rights
-    /// let white = CastlingRights::new(Some(File::H), Some(File::A));
-    /// let black = CastlingRights::new(Some(File::H), Some(File::A));
+    /// let white = CastlingRights::new(Some(Square::H1), Some(Square::A1));
+    /// let black = CastlingRights::new(Some(Square::H8), Some(Square::A8));
     /// let rights = [white, black];
     ///
     /// let mut default_rights = ZobristKey::default();

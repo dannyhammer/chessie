@@ -19,15 +19,15 @@ use super::{
 /// Represents the castling rights of a single player
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Default)]
 pub struct CastlingRights {
-    /// If a right is `Some(file)`, then `file` is the *Rook*'s location
-    pub(crate) short: Option<File>,
-    pub(crate) long: Option<File>,
+    /// If a right is `Some(square)`, then `square` is the *Rook*'s location
+    pub(crate) short: Option<Square>,
+    pub(crate) long: Option<Square>,
 }
 
 impl CastlingRights {
-    /// Creates a new [`CastlingRights`] that permits castling with a Rook on the provided files.
+    /// Creates a new [`CastlingRights`] that permits castling with a Rook on the provided squares.
     #[inline(always)]
-    pub const fn new(short: Option<File>, long: Option<File>) -> Self {
+    pub const fn new(short: Option<Square>, long: Option<Square>) -> Self {
         Self { short, long }
     }
 
@@ -123,20 +123,21 @@ impl Position {
         // Castling is a bit more complicated; especially for Chess960
         let castling = split.next().unwrap_or("-");
         if castling.contains(['K', 'k', 'Q', 'q']) {
-            pos.castling_rights[Color::White].short = castling.contains('K').then_some(File::H);
-            pos.castling_rights[Color::White].long = castling.contains('Q').then_some(File::A);
-            pos.castling_rights[Color::Black].short = castling.contains('k').then_some(File::H);
-            pos.castling_rights[Color::Black].long = castling.contains('q').then_some(File::A);
+            pos.castling_rights[Color::White].short = castling.contains('K').then_some(Square::H1);
+            pos.castling_rights[Color::White].long = castling.contains('Q').then_some(Square::A1);
+            pos.castling_rights[Color::Black].short = castling.contains('k').then_some(Square::H8);
+            pos.castling_rights[Color::Black].long = castling.contains('q').then_some(Square::A8);
         } else if castling.chars().any(|c| File::from_char(c).is_ok()) {
             for c in castling.chars() {
                 let color = Color::from_bool(c.is_ascii_lowercase());
                 let rook_file = File::from_char(c)?;
+                let rook_square = Square::new(rook_file, Rank::first(color));
 
                 let king_file = pos.board.king(color).to_square_unchecked().file();
                 if rook_file > king_file {
-                    pos.castling_rights[color].short = Some(rook_file);
+                    pos.castling_rights[color].short = Some(rook_square);
                 } else {
-                    pos.castling_rights[color].long = Some(rook_file);
+                    pos.castling_rights[color].long = Some(rook_square);
                 }
             }
         }
@@ -216,18 +217,18 @@ impl Position {
 
             // Assign castling rights
             for file in File::iter() {
-                let square = Square::new(file, Rank::ONE);
+                let square = Square::new(file, Rank::first(color));
                 if let Some(PieceKind::Rook) = pos.kind_at(square) {
-                    pos.castling_rights[color].long = Some(file);
+                    pos.castling_rights[color].long = Some(square);
                     break;
                 }
             }
 
             // There's probably a way to do this in a single loop, but this works, too.
             for file in File::iter().rev() {
-                let square = Square::new(file, Rank::ONE);
+                let square = Square::new(file, Rank::first(color));
                 if let Some(PieceKind::Rook) = pos.kind_at(square) {
-                    pos.castling_rights[color].short = Some(file);
+                    pos.castling_rights[color].short = Some(square);
                     break;
                 }
             }
@@ -330,20 +331,20 @@ impl Position {
     pub fn castling_rights_960(&self) -> String {
         let mut castling = String::with_capacity(4);
 
-        if let Some(file) = self.castling_rights()[Color::White].short {
-            castling.push(file.char().to_ascii_uppercase());
+        if let Some(sq) = self.castling_rights()[Color::White].short {
+            castling.push(sq.file().char().to_ascii_uppercase());
         }
 
-        if let Some(file) = self.castling_rights()[Color::White].long {
-            castling.push(file.char().to_ascii_uppercase());
+        if let Some(sq) = self.castling_rights()[Color::White].long {
+            castling.push(sq.file().char().to_ascii_uppercase());
         }
 
-        if let Some(file) = self.castling_rights()[Color::Black].short {
-            castling.push(file.char());
+        if let Some(sq) = self.castling_rights()[Color::Black].short {
+            castling.push(sq.file().char());
         }
 
-        if let Some(file) = self.castling_rights()[Color::Black].long {
-            castling.push(file.char());
+        if let Some(sq) = self.castling_rights()[Color::Black].long {
+            castling.push(sq.file().char());
         }
 
         // If no side can castle, use a hyphen
@@ -588,25 +589,21 @@ impl Position {
                 to
             };
 
-            let Some(victim) = self.take(victim_square) else {
-                panic!("Failed to apply {mv:?} to {self}: No piece found at {victim_square}");
-            };
+            // Safety: This is a capture; there *must* be a piece at the destination square.
+            let victim = unsafe { self.take(victim_square).unwrap_unchecked() };
             let victim_color = victim.color();
 
             // If the capture was on a rook's starting square, disable that side's castling.
-            if to.rank() == Rank::first(victim_color) {
-                // Either a rook was victim, or there wasn't a rook there, in which case castling on that side is already disabled
-                if self.castling_rights[victim_color]
-                    .long
-                    .is_some_and(|file| to.file() == file)
-                {
-                    self.clear_long_castling_rights(victim_color);
-                } else if self.castling_rights[victim_color]
-                    .short
-                    .is_some_and(|file| to.file() == file)
-                {
-                    self.clear_short_castling_rights(victim_color);
-                }
+            if self.castling_rights[victim_color]
+                .long
+                .is_some_and(|sq| to == sq)
+            {
+                self.clear_long_castling_rights(victim_color);
+            } else if self.castling_rights[victim_color]
+                .short
+                .is_some_and(|sq| to == sq)
+            {
+                self.clear_short_castling_rights(victim_color);
             }
 
             // Reset halfmove counter, since a capture occurred
@@ -616,10 +613,9 @@ impl Position {
             self.ep_square = from.forward_by(color, 1);
             self.key.hash_optional_ep_square(self.ep_square());
         } else if mv.is_short_castle() {
-            // Move the rook. Moving the King is already handled before and after this if-else chain
-            if let Some(rook) = self.take(to) {
-                self.place(rook, Square::rook_short_castle(color));
-            }
+            // Safety; This is a castle. There *must* be a Rook at `to`.
+            let rook = unsafe { self.take(to).unwrap_unchecked() };
+            self.place(rook, Square::rook_short_castle(color));
 
             // The King doesn't actually move to the Rook, so update the destination square
             to = Square::king_short_castle(color);
@@ -627,10 +623,9 @@ impl Position {
             // Disable castling
             self.clear_castling_rights(color);
         } else if mv.is_long_castle() {
-            // Move the rook. Moving the King is already handled before and after this if-else chain
-            if let Some(rook) = self.take(to) {
-                self.place(rook, Square::rook_long_castle(color));
-            }
+            // Safety; This is a castle. There *must* be a Rook at `to`.
+            let rook = unsafe { self.take(to).unwrap_unchecked() };
+            self.place(rook, Square::rook_long_castle(color));
 
             // The King doesn't actually move to the Rook, so update the destination square
             to = Square::king_long_castle(color);
@@ -647,12 +642,12 @@ impl Position {
             PieceKind::Rook => {
                 if self.castling_rights[color]
                     .long
-                    .is_some_and(|file| from.file() == file)
+                    .is_some_and(|sq| from == sq)
                 {
                     self.clear_long_castling_rights(color);
                 } else if self.castling_rights[color]
                     .short
-                    .is_some_and(|file| from.file() == file)
+                    .is_some_and(|sq| from == sq)
                 {
                     self.clear_short_castling_rights(color);
                 }
