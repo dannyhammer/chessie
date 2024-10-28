@@ -8,7 +8,7 @@ use std::{fmt, str::FromStr};
 
 use anyhow::{anyhow, Result};
 
-use super::{File, Piece, PieceKind, Position, Square};
+use super::{File, Piece, PieceKind, Position, Rank, Square};
 
 /// Represents the different kinds of moves that can be made during a chess game.
 ///
@@ -479,7 +479,7 @@ impl Move {
             .ok_or(anyhow!("Move str must contain a `to` square. Got {uci:?}"))?;
 
         let from = Square::from_uci(from)?;
-        let to = Square::from_uci(to)?;
+        let mut to = Square::from_uci(to)?;
 
         // Extract information about the piece being moved
         let piece = position.board().piece_at(from).ok_or(anyhow!(
@@ -489,18 +489,26 @@ impl Move {
         // If there is a promotion char, attempt to convert it to a PieceKind
         let promotion = uci.get(4..5).map(PieceKind::from_str).transpose()?;
 
-        // The MoveKind depends on what kind of piece is being moved and where
-        let mut kind = MoveKind::new(piece, from, to, position, promotion);
-
         // To potentially speed up `MoveKind::new`, we check for standard castling notation here, since it will only ever be important if we're parsing castling moves in standard notation.
         let color = piece.color();
-        if from == Square::E1.rank_relative_to(color) {
-            if to == Square::G1.rank_relative_to(color) {
-                kind = MoveKind::ShortCastle;
-            } else if to == Square::C1.rank_relative_to(color) {
-                kind = MoveKind::LongCastle;
+        let rank = Rank::first(color);
+        if from == Square::new(File::E, rank) {
+            // If this is a castle in UCI notation, change the destination square to the appropriate Rook
+            if to == Square::new(File::G, rank) {
+                to = position.castling_rights()[color].short.ok_or(anyhow!(
+                    "Cannot castle {uci:?} because {} has no castling rights for that side",
+                    color.name()
+                ))?;
+            } else if to == Square::new(File::C, rank) {
+                to = position.castling_rights()[color].long.ok_or(anyhow!(
+                    "Cannot castle {uci:?} because {} has no castling rights for that side",
+                    color.name()
+                ))?;
             }
         }
+
+        // The MoveKind depends on what kind of piece is being moved and where
+        let kind = MoveKind::new(piece, from, to, position, promotion);
 
         Ok(Self::new(from, to, kind))
     }
@@ -514,7 +522,8 @@ impl Move {
     /// # use chessie::{Move, Square, MoveKind, PieceKind};
     /// let e7e8Q = Move::new(Square::E7, Square::E8, MoveKind::promotion(PieceKind::Queen));
     /// assert_eq!(e7e8Q.to_uci(), "e7e8q");
-    /// let e1g1 = Move::new(Square::E1, Square::G1, MoveKind::ShortCastle);
+    /// // Since castling is encoded as KxR, the `to` square is the Rook.
+    /// let e1g1 = Move::new(Square::E1, Square::H1, MoveKind::ShortCastle);
     /// assert_eq!(e1g1.to_uci(), "e1g1")
     /// ```
     #[inline(always)]
