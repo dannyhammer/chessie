@@ -498,7 +498,7 @@ impl Move {
         let promotion = uci.get(4..5).map(PieceKind::from_str).transpose()?;
 
         // To potentially speed up `MoveKind::new`, we check for standard castling notation here, since it will only ever be important if we're parsing castling moves in standard notation.
-        let color = piece.color();
+        let color = position.side_to_move();
         let rank = Rank::first(color);
 
         // If this is a castle in UCI notation, change the destination square to the appropriate Rook

@@ -12,6 +12,8 @@ use std::{
 
 use anyhow::Result;
 
+use crate::perft;
+
 use super::{
     bishop_attacks, bishop_rays, compute_attacks_by, king_attacks, knight_attacks, pawn_attacks,
     pawn_pushes, queen_attacks, ray_between, ray_containing, rook_attacks, rook_rays, Bitboard,
@@ -201,63 +203,12 @@ impl Game {
         self.attacks_by_color[color.index()]
     }
 
-    /// Recomputes legal metadata (checkers, checkmask, pinmask, etc.).
+    /// Recursively make all legal moves available until the supplied depth is reached, returning the total number of positions reachable.
+    ///
+    /// See [`perft()`] for more.
     #[inline(always)]
-    fn recompute_legal_masks(&mut self) {
-        let color = self.side_to_move();
-        let opponent = color.opponent();
-        let occupied = self.occupied();
-
-        self.king_square = self.king(color).to_square_unchecked();
-
-        // Reset the pinmask and checkmask
-        self.pinned = Bitboard::EMPTY_BOARD;
-        // Sanity check; no move can capture the enemy King, so his square is removed
-        self.checkmask = self.enemy_or_empty(color) ^ self.king(opponent);
-
-        // Starting off, the easiest checkers to find are Knights and Pawns; just the overlap of their attacks from the King and themselves.
-        self.checkers = self.knights(opponent) & knight_attacks(self.king_square)
-            | self.pawns(opponent) & pawn_attacks(self.king_square, color);
-
-        // By pretending that there is a Rook/Bishop at our King that can attack without blockers,
-        //  we can find all possible sliding attacks *to* the King,
-        //  which lets us figure out who our checkers are and what pieces are pinned.
-        let enemy_sliding_attacks = rook_rays(self.king_square) & self.orthogonal_sliders(opponent)
-            | bishop_rays(self.king_square) & self.diagonal_sliders(opponent);
-
-        // Examine every square that this Rook/Bishop can attack, so that we can figure out if it's a checker or if there are any pinned pieces.
-        for attacker in enemy_sliding_attacks {
-            // Get a ray between this square and the attacker square, excluding both pieces
-            let ray = ray_between(self.king_square, attacker);
-
-            // Whether the piece is a checker or pinned depends on how many pieces are in the ray
-            match (ray & occupied).population() {
-                // There are no pieces between the attacker and the King, so the attacker is a checker
-                0 => self.checkers |= attacker,
-
-                // The piece is not (necessarily) adjacent, but is on a ray to the King, so it is pinned
-                1 => self.pinned |= ray & self.color(color), // Enemy pieces can't be pinned!
-
-                // Since we can't move two pieces off of the same ray in the same turn, we don't care about populations higher than 1
-                _ => {}
-            }
-        }
-
-        // If there are any checkers, we need to update the checkmask
-        if self.checkers.is_nonempty() {
-            // Start with the checkers so they are included in the checkmask (since there is no ray between a King and a Knight)
-            self.checkmask = self.checkers ^ self.king(opponent);
-
-            // There is *usually* less than two checkers, so this rarely loops.
-            for checker in self.checkers {
-                self.checkmask |= ray_between(self.king_square, checker);
-            }
-        }
-
-        // Recompute attack/defend maps
-        for color in Color::all() {
-            self.attacks_by_color[color] = compute_attacks_by(self.board(), color);
-        }
+    pub fn perft(&self, depth: usize) -> u64 {
+        perft(self, depth)
     }
 
     /// Converts the provided string to a [`Move`], if possible, and applies it to the game.
@@ -405,6 +356,65 @@ impl Game {
             _ => self.generate_king_moves::<true>(mask, &mut moves),
         }
         moves
+    }
+
+    /// Recomputes legal metadata (checkers, checkmask, pinmask, etc.).
+    #[inline(always)]
+    fn recompute_legal_masks(&mut self) {
+        let color = self.side_to_move();
+        let opponent = color.opponent();
+        let occupied = self.occupied();
+
+        self.king_square = self.king(color).to_square_unchecked();
+
+        // Reset the pinmask and checkmask
+        self.pinned = Bitboard::EMPTY_BOARD;
+        // Sanity check; no move can capture the enemy King, so his square is removed
+        self.checkmask = self.enemy_or_empty(color) ^ self.king(opponent);
+
+        // Starting off, the easiest checkers to find are Knights and Pawns; just the overlap of their attacks from the King and themselves.
+        self.checkers = self.knights(opponent) & knight_attacks(self.king_square)
+            | self.pawns(opponent) & pawn_attacks(self.king_square, color);
+
+        // By pretending that there is a Rook/Bishop at our King that can attack without blockers,
+        //  we can find all possible sliding attacks *to* the King,
+        //  which lets us figure out who our checkers are and what pieces are pinned.
+        let enemy_sliding_attacks = rook_rays(self.king_square) & self.orthogonal_sliders(opponent)
+            | bishop_rays(self.king_square) & self.diagonal_sliders(opponent);
+
+        // Examine every square that this Rook/Bishop can attack, so that we can figure out if it's a checker or if there are any pinned pieces.
+        for attacker in enemy_sliding_attacks {
+            // Get a ray between this square and the attacker square, excluding both pieces
+            let ray = ray_between(self.king_square, attacker);
+
+            // Whether the piece is a checker or pinned depends on how many pieces are in the ray
+            match (ray & occupied).population() {
+                // There are no pieces between the attacker and the King, so the attacker is a checker
+                0 => self.checkers |= attacker,
+
+                // The piece is not (necessarily) adjacent, but is on a ray to the King, so it is pinned
+                1 => self.pinned |= ray & self.color(color), // Enemy pieces can't be pinned!
+
+                // Since we can't move two pieces off of the same ray in the same turn, we don't care about populations higher than 1
+                _ => {}
+            }
+        }
+
+        // If there are any checkers, we need to update the checkmask
+        if self.checkers.is_nonempty() {
+            // Start with the checkers so they are included in the checkmask (since there is no ray between a King and a Knight)
+            self.checkmask = self.checkers ^ self.king(opponent);
+
+            // There is *usually* less than two checkers, so this rarely loops.
+            for checker in self.checkers {
+                self.checkmask |= ray_between(self.king_square, checker);
+            }
+        }
+
+        // Recompute attack/defend maps
+        for color in Color::all() {
+            self.attacks_by_color[color] = compute_attacks_by(self.board(), color);
+        }
     }
 
     /// Wrapper for all of the `generate_x_moves` methods.
@@ -819,8 +829,13 @@ impl Game {
         default_attacks: Bitboard,
     ) -> Bitboard {
         // Check if this piece is pinned along any of the pinmasks
-        let is_pinned = self.pinned.intersects(square);
-        let pinmask = Bitboard::from_bool(!is_pinned) | ray_containing(square, self.king_square);
+        // let is_pinned = self.pinned.intersects(square);
+        // let pinmask = Bitboard::from_bool(!is_pinned) | ray_containing(square, self.king_square);
+        let pinmask = if self.pinned.intersects(square) {
+            ray_containing(square, self.king_square)
+        } else {
+            self.checkmask
+        };
 
         // Pseudo-legal attacks that are within the check/pin mask and attack non-friendly squares
         default_attacks & self.checkmask & pinmask
