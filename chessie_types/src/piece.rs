@@ -544,6 +544,31 @@ impl Piece {
     /// Start index of color bits.
     const COLOR_BITS: u8 = 3;
 
+    /// An array of all 6 [`Piece`]s, starting with White Pawn.
+    #[inline(always)]
+    pub const fn all() -> [Self; Self::COUNT] {
+        [
+            Self::WHITE_PAWN,
+            Self::WHITE_KNIGHT,
+            Self::WHITE_BISHOP,
+            Self::WHITE_ROOK,
+            Self::WHITE_QUEEN,
+            Self::WHITE_KING,
+            Self::BLACK_PAWN,
+            Self::BLACK_KNIGHT,
+            Self::BLACK_BISHOP,
+            Self::BLACK_ROOK,
+            Self::BLACK_QUEEN,
+            Self::BLACK_KING,
+        ]
+    }
+
+    /// An iterator over all [`Piece`]s, starting with White Pawn.
+    #[inline(always)]
+    pub fn iter() -> impl Iterator<Item = Self> {
+        Self::all().into_iter()
+    }
+
     /// Creates a new [`Piece`] from the given [`Color`] and [`PieceKind`].
     ///
     /// # Example
