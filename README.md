@@ -34,7 +34,7 @@ let nodes = perft(&game, 2);
 assert_eq!(nodes, 400);
 ```
 
--   Note: This library has a [`perft`](https://docs.rs/chessie/0.1.0/chessie/perft/fn.perft.html) function included.
+-   Note: This library has a [`perft`](https://docs.rs/chessie/latest/chessie/perft/fn.perft.html) function included.
 
 Only generate moves from specific squares (Knights, in this case):
 
@@ -101,6 +101,7 @@ Special thanks in particular to:
 -   `2.0.0`:
     -   **Breaking**:
         -   Refactored `CastlingRights` to store a `Square` instead of a `File`.
+        -   Removed `print_perft` in favor of the following functions: `perft`, `splitperft`, `perft_generic`.
     -   Added support for Chess960 (Fischer Random) and Double Chess960 (Double Fischer Random).
         -   Internally changed the representation of Castling moves to "King takes Rook" to support Chess960.
         -   Added utilities for converting to/from Chess960 and standard castling moves.
@@ -108,7 +109,10 @@ Special thanks in particular to:
     -   Made modules private so their re-exports don't clutter up the docs.
     -   Added a `Display` implementation for `MoveKind`.
     -   Improved movegen efficiency a bit.
-    -   Added `Game::attacks_by_color` to quickly lookup attack/defend maps.
+    -   Added `Game::attacks_by_color` to quickly access attack/defend maps.
+    -   Updated `examples/`:
+        -   Removed `splitperft.rs`, as it was redundant.
+        -   Changed `perft.rs` to use `clap` and be overall cleaner.
 -   `1.2.1`:
     -   Fixed major bug causing Zobrist keys to not update properly when making moves on positions (thanks @Serdra on the EP discord).
 -   `1.2.0`:

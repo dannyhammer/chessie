@@ -494,6 +494,10 @@ impl Move {
             "No piece found at {from} when parsing {uci:?} on position {position}"
         ))?;
 
+        // if piece.color() != position.side_to_move() {
+        //     bail!("It is not {}'s turn to move", piece.color().name());
+        // }
+
         // If there is a promotion char, attempt to convert it to a PieceKind
         let promotion = uci.get(4..5).map(PieceKind::from_str).transpose()?;
 
@@ -823,7 +827,8 @@ mod test {
 
         let mv = Move::from_uci(&pos, uci);
         assert!(mv.is_ok(), "{}", mv.unwrap_err());
-        assert_eq!(mv.unwrap(), expected);
+        let mv = mv.unwrap();
+        assert_eq!(mv, expected, "{mv:?} is incorrect for {fen}");
     }
 
     #[test]
@@ -889,6 +894,9 @@ mod test {
         // Queenside (long) castling (White)
         let mv = Move::new(Square::E1, Square::A1, MoveKind::LongCastle);
         test_move_parse(king_fen, "e1c1", mv);
+
+        // Same fen, just Black's turn to move
+        let king_fen = "r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1";
 
         // Kingside (short) castling (Black)
         let mv = Move::new(Square::E8, Square::H8, MoveKind::ShortCastle);

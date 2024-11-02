@@ -12,12 +12,11 @@ use std::{
 
 use anyhow::Result;
 
-use crate::perft;
-
 use super::{
     bishop_attacks, bishop_rays, compute_attacks_by, king_attacks, knight_attacks, pawn_attacks,
-    pawn_pushes, queen_attacks, ray_between, ray_containing, rook_attacks, rook_rays, Bitboard,
-    Color, File, Move, MoveGenIter, MoveKind, MoveList, Piece, PieceKind, Position, Rank, Square,
+    pawn_pushes, perft, queen_attacks, ray_between, ray_containing, rook_attacks, rook_rays,
+    Bitboard, Color, File, Move, MoveGenIter, MoveKind, MoveList, Piece, PieceKind, Position, Rank,
+    Square,
 };
 
 /// A game of chess.
@@ -26,7 +25,6 @@ use super::{
 /// It is the primary type for working with a chess game, and is suitable for use in engines.
 ///
 /// The basic methods you're probably looking for are [`Game::from_fen`], [`Game::make_move`], and [`Game::get_legal_moves`].
-/// You may also want to take a look at [`MoveGenIter`] for generating and enumerating moves one-by-one.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Game {
     /// The current [`Position`] of the game, including piece layouts, castling rights, turn counters, etc.
@@ -35,7 +33,7 @@ pub struct Game {
     /// All squares whose pieces are attacking the side-to-move's King.
     checkers: Bitboard,
 
-    /// If `self.checkers` is empty, this is [`Bitboard::FULL_BOARD`].
+    /// If `self.checkers` is empty, this is a bitboard of all squares that are not occupied by friendly pieces.
     /// Otherwise, it is the path from every checker to the side-to-move's King.
     /// Because, if we're in check, we must either capture or block the checker.
     checkmask: Bitboard,
@@ -57,22 +55,6 @@ impl Game {
     /// Creates a new [`Game`] from  the provided [`Position`].
     #[inline(always)]
     pub fn new(position: Position) -> Self {
-        /*
-        // Compute attack/defend maps by square and color
-        let color = position.side_to_move();
-        let blockers = position.occupied();
-
-        let mut attacks_by_color = [Bitboard::EMPTY_BOARD; Color::COUNT];
-        let mut attacks_by_square = [Bitboard::EMPTY_BOARD; Square::COUNT];
-
-        for square in blockers {
-            let piece = position.piece_at(square).unwrap();
-            let default_attacks = attacks_for(piece, square, blockers);
-            attacks_by_square[square] = default_attacks;
-            attacks_by_color[color] |= default_attacks;
-        }
-        */
-
         let mut game = Self {
             position,
             checkers: Bitboard::EMPTY_BOARD,
@@ -199,12 +181,13 @@ impl Game {
 
     /// Returns a [`Bitboard`] of all squares attacked by `color`.
     #[inline(always)]
-    pub const fn attacks_by_color(&self, color: Color) -> Bitboard {
+    pub const fn attacks_by(&self, color: Color) -> Bitboard {
         self.attacks_by_color[color.index()]
     }
 
     /// Recursively make all legal moves available until the supplied depth is reached, returning the total number of positions reachable.
     ///
+    /// This is just a convenience method.
     /// See [`perft()`] for more.
     #[inline(always)]
     pub fn perft(&self, depth: usize) -> u64 {
@@ -746,7 +729,7 @@ impl Game {
         square: Square,
     ) -> Bitboard {
         let attacks = king_attacks(square);
-        let enemy_attacks = self.attacks_by_color(color.opponent());
+        let enemy_attacks = self.attacks_by(color.opponent());
 
         // If in check, we cannot castle- we can only attack with the default movement of the King.
         let castling = if IN_CHECK {

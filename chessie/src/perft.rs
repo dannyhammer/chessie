@@ -4,13 +4,66 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-use std::{
-    // fmt,
-    // ops::{Add, AddAssign},
-    time::Instant,
-};
-
 use super::Game;
+
+/// Perform a perft at the specified depth, collecting only data about the number of possible positions (nodes).
+///
+/// This performs bulk counting, meaning that, at depth 1, it returns the number of available moves,
+/// rather than making them, recursing again, and returning 1 for each terminal case.
+/// If you do *not* want to use bulk counting, use [`perft_generic`].
+#[inline(always)]
+pub fn perft(game: &Game, depth: usize) -> u64 {
+    // Bulk counting; no need to recurse again just to apply a singular move and return 1.
+    if depth == 1 {
+        return game.get_legal_moves().len() as u64;
+    }
+    // Recursion limit; return 1, since we're fathoming this node.
+    else if depth == 0 {
+        return 1;
+    }
+
+    // Recursively accumulate the nodes from the remaining depths
+    game.get_legal_moves().into_iter().fold(0, |nodes, mv| {
+        nodes + perft(&game.with_move_made(mv), depth - 1)
+    })
+}
+
+/// Perform a splitperft at the specified depth, collecting only data about the number of possible positions (nodes),
+/// and printing the number of nodes reachable after each move available at the root node.
+///
+/// This performs bulk counting, meaning that, at depth 1, it returns the number of available moves,
+/// rather than making them, recursing again, and returning 1 for each terminal case.
+/// If you do *not* want to use bulk counting, use [`perft_generic`].
+#[inline(always)]
+pub fn splitperft(game: &Game, depth: usize) -> u64 {
+    perft_generic::<true, true>(game, depth)
+}
+
+/// Generic version of `perft` that allows you to specify whether to perform bulk counting and splitperft.
+///
+/// If `BULK` is set to `true`, this will perform bulk counting.
+/// If `SPLIT` is set to `true`, this will perform a splitperft.
+pub fn perft_generic<const BULK: bool, const SPLIT: bool>(game: &Game, depth: usize) -> u64 {
+    // Bulk counting; no need to recurse again just to apply a singular move and return 1.
+    if BULK && depth == 1 {
+        return game.get_legal_moves().len() as u64;
+    }
+    // Recursion limit; return 1, since we're fathoming this node.
+    else if depth == 0 {
+        return 1;
+    }
+
+    // Recursively accumulate the nodes from the remaining depths
+    game.get_legal_moves().into_iter().fold(0, |nodes, mv| {
+        let new_nodes = perft_generic::<BULK, false>(&game.with_move_made(mv), depth - 1);
+
+        if SPLIT {
+            println!("{mv:#}\t{new_nodes}");
+        }
+
+        nodes + new_nodes
+    })
+}
 
 /*
 /// A result from a perft function.
@@ -172,89 +225,3 @@ pub fn perft_full(position: &Position, depth: usize) -> PerftResult {
     res
 }
  */
-
-/// Prints a perft at the specified depth.
-///
-/// If the generic parameter `SPLIT` is `true`, this will perform a `splitperft`,
-/// printing all moves at the first level (`depth`) followed by how many nodes
-/// were reached after each of those moves.
-///
-/// If the generic parameter `PRETTY` is `true`, additional info will be printed.
-pub fn print_perft<const PRETTY: bool, const SPLIT: bool>(game: &Game, depth: usize) -> u64 {
-    if PRETTY {
-        println!("Computing PERFT({depth}) of the following position:\n{game}\n",);
-    }
-
-    let now = Instant::now();
-    let total_nodes = if SPLIT {
-        let mut total_nodes = 0;
-        for mv in game.get_legal_moves() {
-            let nodes = perft(&game.with_move_made(mv), depth - 1);
-
-            println!("{mv:#}\t{nodes}");
-            total_nodes += nodes;
-        }
-        println!(); // Empty line between last splitperft and total_nodes
-        total_nodes
-    } else {
-        perft(game, depth)
-    };
-
-    if PRETTY {
-        let elapsed = now.elapsed();
-
-        // Compute nodes-per-second metrics
-        let nps = total_nodes as f32 / elapsed.as_secs_f32();
-        let m_nps = nps / 1_000_000.0;
-
-        println!("Elapsed Time:          {elapsed:.1?}");
-        println!("Total Nodes:           {total_nodes}");
-        println!("Nodes / Sec:           {nps:.0}");
-        println!("M Nodes / Sec:         {m_nps:.1}");
-    } else {
-        println!("{total_nodes}");
-    }
-
-    total_nodes
-}
-
-/// Perform a perft at the specified depth, collecting only data about the number of possible positions (nodes).
-///
-/// This performs bulk counting, meaning that, at depth 1, it returns the number of available moves,
-/// rather than making them, recursing again, and returning 1 for each terminal case.
-#[inline(always)]
-pub fn perft(game: &Game, depth: usize) -> u64 {
-    // Bulk counting; no need to recurse again just to apply a singular move and return 1.
-    if depth == 1 {
-        return game.get_legal_moves().len() as u64;
-    }
-    // Recursion limit; return 1, since we're fathoming this node.
-    else if depth == 0 {
-        return 1;
-    }
-
-    // Recursively accumulate the nodes from the remaining depths
-    game.get_legal_moves().into_iter().fold(0, |nodes, mv| {
-        nodes + perft(&game.with_move_made(mv), depth - 1)
-    })
-}
-
-/// Generic version of `perft` that allows you to specify whether to perform bulk counting or not.
-pub fn perft_generic<const BULK: bool, const SPLIT: bool, const PRETTY: bool>(
-    game: &Game,
-    depth: usize,
-) -> u64 {
-    // Bulk counting; no need to recurse again just to apply a singular move and return 1.
-    if BULK && depth == 1 {
-        return game.get_legal_moves().len() as u64;
-    }
-    // Recursion limit; return 1, since we're fathoming this node.
-    else if depth == 0 {
-        return 1;
-    }
-
-    // Recursively accumulate the nodes from the remaining depths
-    game.get_legal_moves().into_iter().fold(0, |nodes, mv| {
-        nodes + perft_generic::<BULK, false, false>(&game.with_move_made(mv), depth - 1)
-    })
-}
