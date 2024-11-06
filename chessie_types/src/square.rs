@@ -14,6 +14,98 @@ use anyhow::{bail, Context, Result};
 
 use super::{Bitboard, Color};
 
+/// Manhattan and Chebyshev distance between any two squares
+#[rustfmt::skip]
+const DISTANCES: ([[u8;Square::COUNT]; Square::COUNT], [[u8;Square::COUNT]; Square::COUNT]) = {
+    let mut manhattan = [[0; Square::COUNT]; Square::COUNT];
+    let mut chebyshev= [[0; Square::COUNT]; Square::COUNT];
+
+    let mut i = 0;
+    while i < Square::COUNT {
+        let from = Square::from_index_unchecked(i);
+        let mut j = 0;
+
+        while j < Square::COUNT {
+            let to = Square::from_index_unchecked(j);
+            
+            let file_dist = from.distance_files(to);
+            let rank_dist = from.distance_ranks(to);
+
+            manhattan[from.index()][to.index()] = file_dist + rank_dist;
+            chebyshev[from.index()][to.index()] = if file_dist > rank_dist {
+                file_dist
+            } else {
+                rank_dist
+            };
+        
+            j += 1;
+        }
+        i += 1;
+    }
+
+
+    (manhattan, chebyshev)
+};
+
+/// Chebyshev distance of a square from the center of the board.
+/// 
+/// Fetched from https://www.chessprogramming.org/Center_Distance
+#[rustfmt::skip]
+const CENTER_DIST_CHEBYSHEV: [u8; Square::COUNT] = [ 
+  3, 3, 3, 3, 3, 3, 3, 3,
+  3, 2, 2, 2, 2, 2, 2, 3,
+  3, 2, 1, 1, 1, 1, 2, 3,
+  3, 2, 1, 0, 0, 1, 2, 3,
+  3, 2, 1, 0, 0, 1, 2, 3,
+  3, 2, 1, 1, 1, 1, 2, 3,
+  3, 2, 2, 2, 2, 2, 2, 3,
+  3, 3, 3, 3, 3, 3, 3, 3
+];
+
+/// Manhattan distance of a square from the center of the board.
+/// 
+/// Fetched from https://www.chessprogramming.org/Center_Distance
+#[rustfmt::skip]
+const CENTER_DIST_MANHATTAN: [u8; Square::COUNT] = [ 
+  6, 5, 4, 3, 3, 4, 5, 6,
+  5, 4, 3, 2, 2, 3, 4, 5,
+  4, 3, 2, 1, 1, 2, 3, 4,
+  3, 2, 1, 0, 0, 1, 2, 3,
+  3, 2, 1, 0, 0, 1, 2, 3,
+  4, 3, 2, 1, 1, 2, 3, 4,
+  5, 4, 3, 2, 2, 3, 4, 5,
+  6, 5, 4, 3, 3, 4, 5, 6
+];
+
+/// Lookup table to determine whether two squares lie on the same diagonal.
+const IS_DIAGONAL: [[bool; Square::COUNT]; Square::COUNT] = {
+    let mut is_diagonal = [[false; Square::COUNT]; Square::COUNT];
+
+    let mut i = 0;
+    while i < Square::COUNT {
+        let from = Square::from_index_unchecked(i);
+        let mut j = 0;
+
+        while j < Square::COUNT {
+            let to = Square::from_index_unchecked(j);
+
+            // Same square
+            is_diagonal[from.index()][to.index()] = if i == j {
+                true
+            } else {
+                // Otherwise, check for diagonal & not same file/rank
+                (from.0 % 9 == to.0 % 9 || from.0 % 7 == to.0 % 7) // On same diag
+                && from.file().0 != to.file().0 // Not on same file
+                && from.rank().0 != to.rank().0 // Not on same rank
+            };
+
+            j += 1;
+        }
+        i += 1;
+    }
+    is_diagonal
+};
+
 /// Represents a single square on an `8x8` chess board.
 ///
 /// Internally encoded using the following bit pattern:
@@ -385,8 +477,12 @@ impl Square {
     /// assert_eq!(Square::H8.next(), None);
     /// ```
     #[inline(always)]
-    pub fn next(self) -> Option<Self> {
-        (self.0 < Self::MAX).then(|| Self::from_bits_unchecked(self.0 + 1))
+    pub const fn next(self) -> Option<Self> {
+        if self.0 < Self::MAX {
+            Some(Self::from_bits_unchecked(self.0 + 1))
+        } else {
+            None
+        }
     }
 
     /// Iterating backwards over [`Square`]s decreases their internal counter by 1.
@@ -399,8 +495,12 @@ impl Square {
     /// assert_eq!(Square::H8.prev(), Some(Square::G8));
     /// ```
     #[inline(always)]
-    pub fn prev(self) -> Option<Self> {
-        (self.0 > Self::MIN).then(|| Self::from_bits_unchecked(self.0 - 1))
+    pub const fn prev(self) -> Option<Self> {
+        if self.0 > Self::MIN {
+            Some(Self::from_bits_unchecked(self.0 - 1))
+        } else {
+            None
+        }
     }
 
     /// Fetches the inner index value of the [`Square`], which represented as a [`u8`].
@@ -537,6 +637,8 @@ impl Square {
 
     /// Returns the number of squares away `self` is from `other` using [Manhattan distance](https://en.wikipedia.org/wiki/Taxicab_geometry).
     ///
+    /// This indexes into a precomputed lookup table, so it is cheap to call.
+    ///
     /// # Example
     /// ```
     /// # use chessie_types::Square;
@@ -547,10 +649,12 @@ impl Square {
     /// ```
     #[inline(always)]
     pub const fn distance_manhattan(&self, other: Self) -> u8 {
-        self.distance_files(other) + self.distance_ranks(other)
+        DISTANCES.0[self.index()][other.index()]
     }
 
     /// Returns the number of squares away `self` is from `other` using [Chebyshev distance](https://en.wikipedia.org/wiki/Chebyshev_distance).
+    ///
+    /// This indexes into a precomputed lookup table, so it is cheap to call.
     ///
     /// # Example
     /// ```
@@ -562,16 +666,46 @@ impl Square {
     /// ```
     #[inline(always)]
     pub const fn distance_chebyshev(&self, other: Self) -> u8 {
-        let file_dist = self.distance_files(other);
-        let rank_dist = self.distance_ranks(other);
-        if file_dist > rank_dist {
-            file_dist
-        } else {
-            rank_dist
-        }
+        DISTANCES.1[self.index()][other.index()]
+    }
+
+    /// Returns the number of squares away `self` is from the center of the chessboard using [Manhattan distance](https://en.wikipedia.org/wiki/Taxicab_geometry).
+    ///
+    /// This indexes into a precomputed lookup table, so it is cheap to call.
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie_types::Square;
+    /// assert_eq!(Square::D4.center_distance_manhattan(), 0);
+    /// assert_eq!(Square::E5.center_distance_manhattan(), 0);
+    /// assert_eq!(Square::C6.center_distance_manhattan(), 2);
+    /// assert_eq!(Square::A1.center_distance_manhattan(), 6);
+    /// ```
+    #[inline(always)]
+    pub const fn center_distance_manhattan(&self) -> u8 {
+        CENTER_DIST_MANHATTAN[self.index()]
+    }
+
+    /// Returns the number of squares away `self` is from the center of the chessboard using [Chebyshev distance](https://en.wikipedia.org/wiki/Chebyshev_distance).
+    ///
+    /// This indexes into a precomputed lookup table, so it is cheap to call.
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie_types::Square;
+    /// assert_eq!(Square::D4.center_distance_chebyshev(), 0);
+    /// assert_eq!(Square::E5.center_distance_chebyshev(), 0);
+    /// assert_eq!(Square::C6.center_distance_chebyshev(), 1);
+    /// assert_eq!(Square::A1.center_distance_chebyshev(), 3);
+    /// ```
+    #[inline(always)]
+    pub const fn center_distance_chebyshev(&self) -> u8 {
+        CENTER_DIST_CHEBYSHEV[self.index()]
     }
 
     /// Returns `true` if `self` and `other` lie on the same diagonal.
+    ///
+    /// This indexes into a precomputed lookup table, so it is cheap to call.
     ///
     /// # Example
     /// ```
@@ -585,13 +719,7 @@ impl Square {
     /// ```
     #[inline(always)]
     pub const fn is_diagonal_to(&self, other: Self) -> bool {
-        if self.0 == other.0 {
-            return true;
-        }
-
-        (self.0 % 9 == other.0 % 9 || self.0 % 7 == other.0 % 7) // On same diag
-            && self.rank().0 != other.rank().0 // Not on same rank
-            && self.file().0 != other.file().0 // Not on same file
+        IS_DIAGONAL[self.index()][other.index()]
     }
 
     /// Creates a [`Square`] from a string, according to the [Universal Chess Interface](https://en.wikipedia.org//wiki/Universal_Chess_Interface) notation.
@@ -634,21 +762,6 @@ impl Square {
     #[inline(always)]
     pub const fn bitboard(&self) -> Bitboard {
         Bitboard::from_square(*self)
-    }
-
-    /// Computes the distance between `self` and `other`.
-    ///
-    /// # Example
-    /// ```
-    /// # use chessie_types::Square;
-    /// assert_eq!(Square::C4.distance_to(Square::C1), 3);
-    /// assert_eq!(Square::A1.distance_to(Square::A8), 7);
-    /// assert_eq!(Square::D6.distance_to(Square::D6), 0);
-    /// assert_eq!(Square::E2.distance_to(Square::C6), 6);
-    /// ```
-    #[inline(always)]
-    pub const fn distance_to(&self, other: Self) -> u8 {
-        self.file().0.abs_diff(other.file().0) + self.rank().0.abs_diff(other.rank().0)
     }
 
     /// Attempt to offset this [`Square`] by the file and rank offsets.

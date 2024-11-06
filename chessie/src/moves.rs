@@ -344,18 +344,43 @@ impl Move {
         (self.from(), self.to(), self.kind())
     }
 
-    /// Returns `true` if this [`Move`] is a capture of any kind.
+    /// Returns `true` if this [`Move`] is a capture of any kind (capture, promotion-capture, en passant capture).
+    ///
+    /// # Example
+    /// ```
+    /// # use chessie::{Move, Square, MoveKind, PieceKind, Position, FEN_KIWIPETE};
+    /// let position = Position::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/Pp2P3/2N2Q1p/1PPBBPPP/R3K2R b KQkq a3 0 1").unwrap();
+    ///
+    /// let capture = Move::from_uci(&position, "b4c3").unwrap();
+    /// assert_eq!(capture.is_capture(), true);
+    ///
+    /// let ep = Move::from_uci(&position, "b4a3").unwrap();
+    /// assert_eq!(capture.is_capture(), true);
+    /// ```
+    #[inline(always)]
+    pub const fn is_capture(&self) -> bool {
+        self.0 & Self::FLAG_CAPTURE != 0
+    }
+
+    /// Returns `true` if this [`Move`] is a non-capture (quiet) move.
     ///
     /// # Example
     /// ```
     /// # use chessie::{Move, Square, MoveKind, PieceKind, Position, FEN_KIWIPETE};
     /// let position = Position::from_fen(FEN_KIWIPETE).unwrap();
-    /// let e5f7 = Move::from_uci(&position, "e5f7").unwrap();
-    /// assert_eq!(e5f7.is_capture(), true);
+    ///
+    /// let quiet = Move::from_uci(&position, "e1d1").unwrap();
+    /// assert_eq!(quiet.is_quiet(), true);
+    ///
+    /// let castle = Move::from_uci(&position, "e1g1").unwrap();
+    /// assert_eq!(castle.is_quiet(), true);
+    ///
+    /// let push = Move::from_uci(&position, "a2a4").unwrap();
+    /// assert_eq!(push.is_quiet(), true);
     /// ```
     #[inline(always)]
-    pub const fn is_capture(&self) -> bool {
-        self.0 & Self::FLAG_CAPTURE != 0
+    pub const fn is_quiet(&self) -> bool {
+        self.0 & Self::FLAG_CAPTURE == 0
     }
 
     /// Returns `true` if this [`Move`] is en passant.
@@ -732,6 +757,19 @@ mod test {
         assert!(Move::new(from, to, MoveKind::EnPassantCapture).is_capture());
         assert!(!Move::new(from, to, MoveKind::promotion(PieceKind::Queen)).is_capture());
         assert!(Move::new(from, to, MoveKind::promotion_capture(PieceKind::Queen)).is_capture());
+    }
+
+    #[test]
+    fn test_move_is_quiet() {
+        let (from, to) = (Square::A1, Square::H8);
+        assert!(Move::new(from, to, MoveKind::Quiet).is_quiet());
+        assert!(Move::new(from, to, MoveKind::ShortCastle).is_quiet());
+        assert!(Move::new(from, to, MoveKind::LongCastle).is_quiet());
+        assert!(Move::new(from, to, MoveKind::PawnDoublePush).is_quiet());
+        assert!(!Move::new(from, to, MoveKind::Capture).is_quiet());
+        assert!(!Move::new(from, to, MoveKind::EnPassantCapture).is_quiet());
+        assert!(Move::new(from, to, MoveKind::promotion(PieceKind::Queen)).is_quiet());
+        assert!(!Move::new(from, to, MoveKind::promotion_capture(PieceKind::Queen)).is_quiet());
     }
 
     #[test]
