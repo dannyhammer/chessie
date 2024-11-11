@@ -14,18 +14,25 @@ use super::Game;
 #[inline(always)]
 pub fn perft(game: &Game, depth: usize) -> u64 {
     // Bulk counting; no need to recurse again just to apply a singular move and return 1.
-    if depth == 1 {
-        return game.get_legal_moves().len() as u64;
-    }
+    // if depth == 1 {
+    //     return game.get_legal_moves().len() as u64;
+    // } else
     // Recursion limit; return 1, since we're fathoming this node.
-    else if depth == 0 {
+    if depth == 0 {
         return 1;
     }
 
     // Recursively accumulate the nodes from the remaining depths
-    game.get_legal_moves().into_iter().fold(0, |nodes, mv| {
-        nodes + perft(&game.with_move_made(mv), depth - 1)
-    })
+    // game.get_legal_moves().into_iter().fold(0, |nodes, mv| {
+    //     nodes + perft(&game.with_move_made(mv), depth - 1)
+    // })
+
+    game.get_pseudo_legal_moves()
+        .into_iter()
+        .filter(|mv| game.is_legal(*mv))
+        .fold(0, |nodes, mv| {
+            nodes + perft(&game.with_move_made(mv), depth - 1)
+        })
 }
 
 /// Perform a splitperft at the specified depth, collecting only data about the number of possible positions (nodes),
@@ -36,7 +43,7 @@ pub fn perft(game: &Game, depth: usize) -> u64 {
 /// If you do *not* want to use bulk counting, use [`perft_generic`].
 #[inline(always)]
 pub fn splitperft(game: &Game, depth: usize) -> u64 {
-    perft_generic::<true, true>(game, depth)
+    perft_generic::<false, true>(game, depth)
 }
 
 /// Generic version of `perft` that allows you to specify whether to perform bulk counting and splitperft.
@@ -45,7 +52,7 @@ pub fn splitperft(game: &Game, depth: usize) -> u64 {
 /// If `SPLIT` is set to `true`, this will perform a splitperft.
 pub fn perft_generic<const BULK: bool, const SPLIT: bool>(game: &Game, depth: usize) -> u64 {
     // Bulk counting; no need to recurse again just to apply a singular move and return 1.
-    if BULK && depth == 1 {
+    if BULK && !SPLIT && depth == 1 {
         return game.get_legal_moves().len() as u64;
     }
     // Recursion limit; return 1, since we're fathoming this node.
@@ -54,15 +61,19 @@ pub fn perft_generic<const BULK: bool, const SPLIT: bool>(game: &Game, depth: us
     }
 
     // Recursively accumulate the nodes from the remaining depths
-    game.get_legal_moves().into_iter().fold(0, |nodes, mv| {
-        let new_nodes = perft_generic::<BULK, false>(&game.with_move_made(mv), depth - 1);
+    game.get_pseudo_legal_moves()
+        .into_iter()
+        .filter(|mv| game.is_legal(*mv))
+        .fold(0, |nodes, mv| {
+            // game.get_legal_moves().into_iter().fold(0, |nodes, mv| {
+            let new_nodes = perft_generic::<BULK, false>(&game.with_move_made(mv), depth - 1);
 
-        if SPLIT {
-            println!("{mv:#}\t{new_nodes}");
-        }
+            if SPLIT {
+                println!("{mv:}\t{new_nodes}");
+            }
 
-        nodes + new_nodes
-    })
+            nodes + new_nodes
+        })
 }
 
 /*

@@ -5,11 +5,11 @@
  */
 
 use anyhow::Result;
-use chessie::{perft, Game};
+use chessie::{perft_generic, Game};
 
 fn test_perft_fen_nodes(depth: usize, fen: &str, expected: u64) {
     let position = Game::from_fen(fen).unwrap();
-    let res = perft(&position, depth);
+    let res = perft_generic::<false, false>(&position, depth);
     assert_eq!(res, expected);
 }
 
@@ -30,7 +30,7 @@ fn test_epd(epd_file: &str, max_depth: usize) -> Result<()> {
 
             let mut position = Game::from_fen(fen)?;
 
-            let nodes = perft(&mut position, depth);
+            let nodes = perft_generic::<false, false>(&mut position, depth);
 
             assert_eq!(
                 nodes, expected,
@@ -219,8 +219,8 @@ fn do_perft(fen: &str, results: &[u64]) {
     println!("{fen}");
     let pos = Game::from_fen(fen).unwrap();
     for (depth, result) in results.iter().enumerate() {
-        // let nodes = pos.perft(idx as u8);
-        let nodes = perft(&pos, depth);
+        // let nodes = pos.perft_generic::<false, false>(idx as u8);
+        let nodes = perft_generic::<false, false>(&pos, depth);
         assert_eq!(nodes, *result,);
     }
 }

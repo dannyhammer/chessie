@@ -241,7 +241,6 @@ impl Game {
     }
 
     // TODO: Needs testing
-    /*
     /// Checks if playing the provided [`Move`] is legal on the current position.
     ///
     /// This aims to be faster than playing the move and recalculating checkmasks and
@@ -250,6 +249,166 @@ impl Game {
     /// computes all square attacked by enemy pieces,
     /// and returns whether or not those attacks contain our King.
     pub fn is_legal(&self, mv: Move) -> bool {
+        let from = mv.from();
+        // If there isn't a piece here, this move isn't legal
+        let Some(piece) = self.piece_at(from) else {
+            return false;
+        };
+
+        let color = piece.color();
+        // If the piece is the wrong color, this move isn't legal
+        if color != self.side_to_move() {
+            return false;
+        }
+
+        // This is mutable because Castling may change it
+        let to = mv.to();
+
+        // Castling requires the path to be safe and clear
+        if mv.is_castle() {
+            // Get the destinations for the King and Rook
+            let (king_dst, rook_dst) = {
+                let (king_file, rook_file) = if to.file() > from.file() {
+                    (File::G, File::F)
+                } else {
+                    (File::C, File::D)
+                };
+                let rank = from.rank();
+                (Square::new(king_file, rank), Square::new(rook_file, rank))
+            };
+
+            // The King and Rook are not considered blockers, because they move through each other
+            let blockers = self.occupied() ^ from ^ to;
+
+            // All squares between the King and his destination (inclusive) must be empty
+            if (ray_between(from, king_dst) | king_dst).intersects(blockers) {
+                // eprintln!("{mv}: King {from} -> {king_dst} is not empty");
+                return false;
+            }
+
+            // All squares between the Rook and its destination (inclusive) must be empty
+            if (ray_between(to, rook_dst) | rook_dst).intersects(blockers) {
+                // eprintln!("{mv}: Rook {to} -> {rook_dst} is not empty");
+                return false;
+            }
+
+            // All squares between the King (inclusive) and his destination (inclusive) must not be attacked
+            let enemy_attacks = self.attacks_by(color.opponent());
+            if (ray_between(from, king_dst) | king_dst | from).intersects(enemy_attacks) {
+                // eprintln!("{mv}: {from} -> {king_dst} is unsafe");
+                return false;
+            }
+
+            // Castling is legal; update destination for King
+            // to = king_dst;
+        } else
+        // After performing en passant, is our King in check?
+        if mv.is_en_passant() {
+            // Cant perform en passant if it's not available
+            let Some(ep_square) = self.ep_square() else {
+                return false;
+            };
+
+            // If this Pawn isn't on an adjacent file and the same rank as the enemy Pawn that caused en passant to be possible, it can't perform en passant
+            if from.distance_chebyshev(ep_square) != 1 {
+                return false;
+            }
+
+            let ep_bb = ep_square.bitboard();
+            let ep_target_bb = ep_bb.backward_by(color, 1);
+            let blockers_after_ep = (self.occupied() ^ ep_target_bb ^ from) | ep_bb;
+
+            // If, after performing EP, any sliders can attack our King, EP is not legal
+            if bishop_attacks(self.king_square, blockers_after_ep)
+                .intersects(self.diagonal_sliders(color.opponent()))
+                || rook_attacks(self.king_square, blockers_after_ep)
+                    .intersects(self.orthogonal_sliders(color.opponent()))
+            {
+                return false;
+            }
+        } else
+        // Must move to either an empty square or one occupied by a non-King enemy piece.
+        if (self.enemy_or_empty(color) ^ self.king(color.opponent())).is_disjoint(to) {
+            // Can't capture the enemy King
+            // if to == self.king(color.opponent()).to_square_unchecked() {
+            return false;
+        }
+
+        // If, after performing this move, any sliders can attack our King, this move is not legal
+        // let blockers_after_mv = blockers ^ from ^ to;
+        // if bishop_attacks(self.king_square, blockers_after_mv)
+        //     .intersects(self.diagonal_sliders(color.opponent()))
+        //     || rook_attacks(self.king_square, blockers_after_mv)
+        //         .intersects(self.orthogonal_sliders(color.opponent()))
+        // {
+        //     return false;
+        // }
+
+        // Catch-all: Make the move, then see if the enemy can attack our King
+        let new = self.with_move_made(mv);
+        return new
+            .attacks_by(color.opponent())
+            .is_disjoint(new.king(color));
+
+        /*
+        let pinmask = if self.pinned().intersects(from) {
+            ray_between(self.king_square, from)
+        } else {
+            Bitboard::FULL_BOARD
+        };
+
+        // If in check, the move must block the check, capture the checker, or evade the check
+        if self.is_in_check() {
+            // The King must evade check
+            if piece.is_king() {
+                let enemy_attacks = self.attacks_by(color.opponent());
+                let safe_squares =
+                    !(enemy_attacks | self.generate_discoverable_checks_bitboard(color));
+
+                return safe_squares.intersects(to);
+            } else {
+                // All other pieces must block the check or capture the checker
+                // let mut legal_destinations = self.checkmask;
+
+                // // However, if the piece is pinned, it must not leave it's pinmask
+                // if self.pinned().intersects(from) {
+                //     legal_destinations &= ray_containing(self.king_square, from);
+                // }
+
+                // let pinmask = if self.pinned.intersects(from) {
+                //     ray_containing(from, self.king_square)
+                // } else {
+                //     self.checkmask
+                // };
+                // return pinmask.intersects(to);
+
+                // return legal_destinations.intersects(to);
+                let mut new = self.with_move_made(mv);
+                new.toggle_side_to_move();
+                return !new.is_in_check();
+            }
+        }
+         */
+
+        /*
+        // If in check, the King must evade check (or capture the checker).
+        if piece.is_king() && self.is_in_check() {
+            let enemy_attacks = self.attacks_by(color.opponent());
+            let safe_squares = !(enemy_attacks | self.generate_discoverable_checks_bitboard(color));
+
+            return safe_squares.intersects(to);
+        }
+
+        // If pinned the move must capture the pinner or remain along the pinned ray
+        if self.pinned().intersects(from) {
+            return ray_between(self.king_square, from).intersects(to);
+        }
+
+        // All other moves are legal
+        return true;
+          */
+
+        /*
         // Create a new board to work with
         let mut board = self.board;
 
@@ -292,13 +451,9 @@ impl Game {
         board.place(piece, to);
 
         // Compute the enemy attacks to our King
-        let king_bb = board.king(color);
-        let enemy_attacks =
-            compute_attacks_to(&board, king_bb.to_square_unchecked(), color.opponent());
-
-        enemy_attacks.contains(&king_bb)
+        compute_attacks_by(&board, color.opponent()).is_disjoint(board.king(color))
+         */
     }
-     */
 
     /// Generate all legal moves from the current position.
     ///

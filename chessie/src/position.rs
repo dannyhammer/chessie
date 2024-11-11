@@ -12,8 +12,11 @@ use std::{
 
 use anyhow::{anyhow, bail, Result};
 
+use crate::{king_attacks, pawn_attacks, pawn_pushes};
+
 use super::{
-    Bitboard, Color, File, Move, MoveKind, Piece, PieceKind, Rank, Square, ZobristKey, FEN_STARTPOS,
+    attacks_for, Bitboard, Color, File, Move, MoveKind, MoveList, Piece, PieceKind, Rank, Square,
+    ZobristKey, FEN_STARTPOS,
 };
 
 /// Represents the castling rights of a single player
@@ -674,6 +677,120 @@ impl Position {
 
         // Toggle the hash of the current player
         self.key.hash_side_to_move(self.side_to_move());
+    }
+
+    /// Generate all pseudo-legal moves from the current position.
+    ///
+    /// Pseudo-legal moves are consistent with the current board representation,
+    /// but may leave the side-to-move's King in check after being made.
+    #[inline(always)]
+    pub fn get_pseudo_legal_moves(&self) -> MoveList {
+        let friendlies = self.color(self.side_to_move());
+        self.get_pseudo_legal_moves_from(friendlies)
+    }
+
+    /// Generate all pseudo-legal moves from the current position that originate from squares in `mask`.
+    ///
+    /// Pseudo-legal moves are consistent with the current board representation,
+    /// but may leave the side-to-move's King in check after being made.
+    #[inline(always)]
+    pub fn get_pseudo_legal_moves_from(&self, mask: Bitboard) -> MoveList {
+        let mut moves = MoveList::default();
+        let color = self.side_to_move();
+        let blockers = self.occupied();
+        let enemy_or_empty = self.enemy_or_empty(color);
+        // Ensure the mask ONLY contains the side-to-move's pieces
+        let mask = mask & self.color(color);
+
+        let pawns = self.pawns(color) & mask;
+        let king = self.king(color) & mask;
+        let normal_pieces = (blockers ^ pawns ^ king) & mask;
+
+        // Pawns first
+        for from in pawns {
+            let attacks = pawn_attacks(from, color)
+                & (self.color(color.opponent())
+                    | self.ep_square().map(|sq| sq.bitboard()).unwrap_or_default());
+
+            let all_but_this_pawn = blockers ^ from;
+            let double_push_mask = all_but_this_pawn | all_but_this_pawn.forward_by(color, 1);
+            let pushes = pawn_pushes(from, color) & !double_push_mask & !blockers;
+
+            for to in attacks | pushes {
+                // Captures can be normal, en passant, or promotions
+                let mut kind = if self.has(to) {
+                    MoveKind::Capture
+                } else {
+                    MoveKind::Quiet
+                };
+
+                if to.rank() == Rank::eighth(color) {
+                    // If this move also captures, it's a capture-promote
+                    if kind == MoveKind::Capture {
+                        moves.push(Move::new(from, to, MoveKind::CaptureAndPromoteKnight));
+                        moves.push(Move::new(from, to, MoveKind::CaptureAndPromoteBishop));
+                        moves.push(Move::new(from, to, MoveKind::CaptureAndPromoteRook));
+                        kind = MoveKind::CaptureAndPromoteQueen;
+                    } else {
+                        moves.push(Move::new(from, to, MoveKind::PromoteKnight));
+                        moves.push(Move::new(from, to, MoveKind::PromoteBishop));
+                        moves.push(Move::new(from, to, MoveKind::PromoteRook));
+                        kind = MoveKind::PromoteQueen;
+                    }
+                } else
+                // If this pawn is moving to the en passant square, it's en passant
+                if Some(to) == self.ep_square() {
+                    kind = MoveKind::EnPassantCapture;
+                } else
+                // If the Pawn is moving two ranks, it's a double push
+                if from.distance_ranks(to) == 2 {
+                    kind = MoveKind::PawnDoublePush;
+                }
+
+                moves.push(Move::new(from, to, kind));
+            }
+        }
+
+        // King next
+        for from in king {
+            // Castling is handled separately from regular attacks
+            if let Some(rook) = self.castling_rights_for(color).short {
+                moves.push(Move::new(from, rook, MoveKind::ShortCastle));
+            }
+
+            if let Some(rook) = self.castling_rights_for(color).long {
+                moves.push(Move::new(from, rook, MoveKind::LongCastle));
+            }
+
+            // Attacks are either quiet or captures
+            for to in king_attacks(from) & enemy_or_empty {
+                let kind = if self.has(to) {
+                    MoveKind::Capture
+                } else {
+                    MoveKind::Quiet
+                };
+
+                moves.push(Move::new(from, to, kind));
+            }
+        }
+
+        // All remaining pieces
+        for (from, piece) in self.iter_for(normal_pieces) {
+            let attacks = attacks_for(piece, from, blockers) & enemy_or_empty;
+
+            for to in attacks {
+                // If the destination is occupied, it's a capture. Otherwise, it's a quiet.
+                let kind = if self.has(to) {
+                    MoveKind::Capture
+                } else {
+                    MoveKind::Quiet
+                };
+
+                moves.push(Move::new(from, to, kind));
+            }
+        }
+
+        moves
     }
 
     /// Places a piece at the provided square, updating Zobrist hash information.
