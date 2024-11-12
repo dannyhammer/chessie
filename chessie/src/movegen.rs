@@ -525,7 +525,9 @@ pub const fn pawn_moves(square: Square, color: Color, blockers: Bitboard) -> Bit
     let shift_mask = all_but_this_pawn.or(all_but_this_pawn.forward_by(color, 1));
 
     // If there is a piece in front of this pawn, we cannot push two
-    let pushes = pawn_pushes(square, color).and(shift_mask.not());
+    let pushes = pawn_pushes(square, color)
+        .and(shift_mask.not())
+        .and(blockers.not());
 
     // By default, a pawn can only attack if there is a piece available to take
     let attacks = pawn_attacks(square, color).and(blockers);

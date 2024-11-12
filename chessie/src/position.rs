@@ -551,6 +551,35 @@ impl Position {
         Ok(())
     }
 
+    /*
+    /// Checks if playing the provided [`Move`] is pseudo-legal on the current position.
+    ///
+    /// A pseudo-legal move obeys all rules of chess except that the side-to-move's King
+    /// may be left in Check after applying the move.
+    pub fn is_pseudo_legal(&self, mv: Move) -> bool {
+        let from = mv.from();
+        // If there isn't a piece here, this move isn't legal
+        let Some(piece) = self.piece_at(from) else {
+            return false;
+        };
+
+        let color = piece.color();
+        // If the piece is the wrong color, this move isn't legal
+        if color != self.side_to_move() {
+            return false;
+        }
+        let to = mv.to();
+        let opponent = color.opponent();
+
+        // Ensure the destination square is appropriate for the piece type
+        // match piece.kind() {
+        //     PieceKind::Pawn => {}
+        // }
+
+        return true;
+    }
+     */
+
     /// Apply the provided `moves` to the board. No enforcement of legality.
     #[inline(always)]
     pub fn make_moves(&mut self, moves: impl IntoIterator<Item = Move>) {
@@ -697,8 +726,10 @@ impl Position {
     pub fn get_pseudo_legal_moves_from(&self, mask: Bitboard) -> MoveList {
         let mut moves = MoveList::default();
         let color = self.side_to_move();
+        let opponent = color.opponent();
         let blockers = self.occupied();
-        let enemy_or_empty = self.enemy_or_empty(color);
+        // Cannot capture enemy king, so remove him from the possible target squares
+        let enemy_or_empty = self.enemy_or_empty(color) ^ self.king(opponent);
         // Ensure the mask ONLY contains the side-to-move's pieces
         let mask = mask & self.color(color);
 
@@ -709,7 +740,7 @@ impl Position {
         // Pawns first
         for from in pawns {
             let attacks = pawn_attacks(from, color)
-                & (self.color(color.opponent())
+                & (self.color(opponent)
                     | self.ep_square().map(|sq| sq.bitboard()).unwrap_or_default());
 
             let all_but_this_pawn = blockers ^ from;

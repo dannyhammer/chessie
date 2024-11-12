@@ -10,7 +10,7 @@ use chessie::{perft_generic, Game};
 fn test_perft_fen_nodes(depth: usize, fen: &str, expected: u64) {
     let position = Game::from_fen(fen).unwrap();
     let res = perft_generic::<false, false>(&position, depth);
-    assert_eq!(res, expected);
+    assert_eq!(res, expected, "PERFT(depth) failed on {fen}");
 }
 
 fn test_epd(epd_file: &str, max_depth: usize) -> Result<()> {
@@ -221,7 +221,7 @@ fn do_perft(fen: &str, results: &[u64]) {
     for (depth, result) in results.iter().enumerate() {
         // let nodes = pos.perft_generic::<false, false>(idx as u8);
         let nodes = perft_generic::<false, false>(&pos, depth);
-        assert_eq!(nodes, *result,);
+        assert_eq!(nodes, *result, "PERFT({depth}) failed on {fen}");
     }
 }
 
